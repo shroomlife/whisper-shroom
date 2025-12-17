@@ -1,5 +1,5 @@
 """
-WhisperVoice - Simple Voice-to-Text Tool for Windows 11
+WhsiperShroom - Simple Voice-to-Text Tool for Windows 11
 Large window (800x600), compact layout
 """
 
@@ -22,14 +22,14 @@ import tkinter as tk
 from tkinter import messagebox
 import ctypes
 
-CONFIG_PATH = Path(os.environ.get('APPDATA', '.')) / 'WhisperVoice' / 'config.json'
+CONFIG_PATH = Path(os.environ.get('APPDATA', '.')) / 'WhsiperShroom' / 'config.json'
 
 # Window size - LARGE to account for DPI scaling
 WIN_W = 800
 WIN_H = 600
 
 
-class WhisperVoice:
+class WhsiperShroom:
     def __init__(self):
         self.api_key = None
         self.client = None
@@ -90,12 +90,16 @@ class WhisperVoice:
     # ==================== SETUP DIALOG ====================
     def show_setup_dialog(self):
         dlg = tk.Toplevel(self.root)
-        dlg.title("WhisperVoice - Einstellungen")
+        dlg.title("WhsiperShroom - Einstellungen")
         dlg.geometry(f"{WIN_W}x{WIN_H}")
         dlg.resizable(False, False)
         dlg.configure(bg='white')
         dlg.attributes('-topmost', True)
         dlg.grab_set()
+        try:
+            dlg.iconbitmap('icon.ico')
+        except:
+            pass
         self.center(dlg)
         
         result = {'ok': False}
@@ -105,7 +109,7 @@ class WhisperVoice:
         content.place(relx=0.5, rely=0.5, anchor='center')
         
         # Title
-        tk.Label(content, text="🎤 WhisperVoice",
+        tk.Label(content, text="🎤 WhsiperShroom",
                 font=('Arial', 20, 'bold'), bg='white', fg='#333').pack(pady=(0, 5))
         tk.Label(content, text="Voice-to-Text mit OpenAI Whisper",
                 font=('Arial', 10), bg='white', fg='#666').pack(pady=(0, 30))
@@ -167,11 +171,15 @@ class WhisperVoice:
             return
         
         self.main_window = tk.Toplevel(self.root)
-        self.main_window.title("WhisperVoice")
+        self.main_window.title("WhsiperShroom")
         self.main_window.geometry(f"{WIN_W}x{WIN_H}")
         self.main_window.resizable(False, False)
         self.main_window.configure(bg='white')
         self.main_window.attributes('-topmost', True)
+        try:
+            self.main_window.iconbitmap('icon.ico')
+        except:
+            pass
         self.center(self.main_window)
         
         # Container for content - centered
@@ -436,7 +444,7 @@ class WhisperVoice:
             keyboard.unhook_all()
             keyboard.add_hotkey(self.hotkey, self.toggle_recording)
             if self.tray_icon:
-                self.tray_icon.title = f"WhisperVoice ({self.hotkey.upper()})"
+                self.tray_icon.title = f"WhsiperShroom ({self.hotkey.upper()})"
     
     def quit_app(self, *args):
         if self.recording:
@@ -464,12 +472,12 @@ class WhisperVoice:
             pystray.MenuItem('Beenden', self.quit_app)
         )
         
-        self.tray_icon = pystray.Icon("WhisperVoice", self.create_tray_icon(),
-                                      f"WhisperVoice ({self.hotkey.upper()})", menu)
+        self.tray_icon = pystray.Icon("WhsiperShroom", self.create_tray_icon(),
+                                      f"WhsiperShroom ({self.hotkey.upper()})", menu)
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
         self.root.mainloop()
 
 
 if __name__ == "__main__":
-    app = WhisperVoice()
+    app = WhsiperShroom()
     app.run()
