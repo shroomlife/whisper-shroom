@@ -4,7 +4,7 @@ a = Analysis(
     ['whisper_voice.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('icon.ico', '.')],
     hiddenimports=[
         'pystray._win32',
         'PIL._tkinter_finder',

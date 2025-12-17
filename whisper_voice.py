@@ -24,6 +24,14 @@ import ctypes
 
 CONFIG_PATH = Path(os.environ.get('APPDATA', '.')) / 'WhisperShroom' / 'config.json'
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller bundle."""
+    if hasattr(sys, '_MEIPASS'):
+        # Running as bundled EXE
+        return os.path.join(sys._MEIPASS, relative_path)
+    # Running as script
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
+
 # Window size - LARGE to account for DPI scaling
 WIN_W = 800
 WIN_H = 600
@@ -97,7 +105,7 @@ class WhisperShroom:
         dlg.attributes('-topmost', True)
         dlg.grab_set()
         try:
-            dlg.iconbitmap('icon.ico')
+            dlg.iconbitmap(resource_path('icon.ico'))
         except:
             pass
         self.center(dlg)
@@ -158,7 +166,7 @@ class WhisperShroom:
     
     # ==================== TRAY ICON ====================
     def create_tray_icon(self, state='idle'):
-        return Image.open("icon.ico")
+        return Image.open(resource_path("icon.ico"))
     
     def update_tray(self, state):
         if self.tray_icon:
@@ -177,7 +185,7 @@ class WhisperShroom:
         self.main_window.configure(bg='white')
         self.main_window.attributes('-topmost', True)
         try:
-            self.main_window.iconbitmap('icon.ico')
+            self.main_window.iconbitmap(resource_path('icon.ico'))
         except:
             pass
         self.center(self.main_window)
