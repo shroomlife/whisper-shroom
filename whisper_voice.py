@@ -1,5 +1,5 @@
 """
-WhsiperShroom - Simple Voice-to-Text Tool for Windows 11
+WhisperShroom - Simple Voice-to-Text Tool for Windows 11
 Large window (800x600), compact layout
 """
 
@@ -22,14 +22,14 @@ import tkinter as tk
 from tkinter import messagebox
 import ctypes
 
-CONFIG_PATH = Path(os.environ.get('APPDATA', '.')) / 'WhsiperShroom' / 'config.json'
+CONFIG_PATH = Path(os.environ.get('APPDATA', '.')) / 'WhisperShroom' / 'config.json'
 
 # Window size - LARGE to account for DPI scaling
 WIN_W = 800
 WIN_H = 600
 
 
-class WhsiperShroom:
+class WhisperShroom:
     def __init__(self):
         self.api_key = None
         self.client = None
@@ -90,7 +90,7 @@ class WhsiperShroom:
     # ==================== SETUP DIALOG ====================
     def show_setup_dialog(self):
         dlg = tk.Toplevel(self.root)
-        dlg.title("WhsiperShroom - Einstellungen")
+        dlg.title("WhisperShroom - Einstellungen")
         dlg.geometry(f"{WIN_W}x{WIN_H}")
         dlg.resizable(False, False)
         dlg.configure(bg='white')
@@ -109,7 +109,7 @@ class WhsiperShroom:
         content.place(relx=0.5, rely=0.5, anchor='center')
         
         # Title
-        tk.Label(content, text="🎤 WhsiperShroom",
+        tk.Label(content, text="🎤 WhisperShroom",
                 font=('Arial', 20, 'bold'), bg='white', fg='#333').pack(pady=(0, 5))
         tk.Label(content, text="Voice-to-Text mit OpenAI Whisper",
                 font=('Arial', 10), bg='white', fg='#666').pack(pady=(0, 30))
@@ -171,7 +171,7 @@ class WhsiperShroom:
             return
         
         self.main_window = tk.Toplevel(self.root)
-        self.main_window.title("WhsiperShroom")
+        self.main_window.title("WhisperShroom")
         self.main_window.geometry(f"{WIN_W}x{WIN_H}")
         self.main_window.resizable(False, False)
         self.main_window.configure(bg='white')
@@ -444,7 +444,7 @@ class WhsiperShroom:
             keyboard.unhook_all()
             keyboard.add_hotkey(self.hotkey, self.toggle_recording)
             if self.tray_icon:
-                self.tray_icon.title = f"WhsiperShroom ({self.hotkey.upper()})"
+                self.tray_icon.title = f"WhisperShroom ({self.hotkey.upper()})"
     
     def quit_app(self, *args):
         if self.recording:
@@ -472,12 +472,12 @@ class WhsiperShroom:
             pystray.MenuItem('Beenden', self.quit_app)
         )
         
-        self.tray_icon = pystray.Icon("WhsiperShroom", self.create_tray_icon(),
-                                      f"WhsiperShroom ({self.hotkey.upper()})", menu)
+        self.tray_icon = pystray.Icon("WhisperShroom", self.create_tray_icon(),
+                                      f"WhisperShroom ({self.hotkey.upper()})", menu)
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
         self.root.mainloop()
 
 
 if __name__ == "__main__":
-    app = WhsiperShroom()
+    app = WhisperShroom()
     app.run()

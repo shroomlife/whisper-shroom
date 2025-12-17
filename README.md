@@ -1,4 +1,4 @@
-# WhsiperShroom 🎤
+# WhisperShroom 🎤
 
 Ein simples Windows 11 Tool für Voice-to-Text mit OpenAI Whisper API.
 
@@ -13,7 +13,7 @@ Ein simples Windows 11 Tool für Voice-to-Text mit OpenAI Whisper API.
 
 ## Benutzung
 
-1. **Starten** - Doppelklick auf `WhsiperShroom.exe`
+1. **Starten** - Doppelklick auf `WhisperShroom.exe`
 2. **API-Key** - Beim ersten Start OpenAI API-Key eingeben
 3. **Aufnehmen** - `Ctrl+Shift+R` drücken oder Tray-Icon klicken
 4. **Stoppen** - Nochmal `Ctrl+Shift+R` oder Stop-Button
@@ -37,13 +37,13 @@ pip install -r requirements.txt
 python -m PyInstaller --clean --noconfirm whisper_voice.spec
 ```
 
-Die fertige `WhsiperShroom.exe` liegt dann in `dist/`.
+Die fertige `WhisperShroom.exe` liegt dann in `dist/`.
 
 ## Konfiguration
 
 Der API-Key wird gespeichert in:
 ```
-%APPDATA%\WhsiperShroom\config.json
+%APPDATA%\WhisperShroom\config.json
 ```
 
 Kann jederzeit über das Tray-Menü geändert werden.
