@@ -22,6 +22,10 @@ import tkinter as tk
 from tkinter import messagebox
 import ctypes
 
+# Set Windows AppUserModelID so taskbar shows "WhisperShroom" instead of "Python"
+if sys.platform == 'win32':
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('shroomlife.whispershroom')
+
 CONFIG_PATH = Path(os.environ.get('APPDATA', '.')) / 'WhisperShroom' / 'config.json'
 
 def resource_path(relative_path):
