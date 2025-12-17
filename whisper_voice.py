@@ -195,17 +195,29 @@ class WhisperVoice:
         # Cancel recording without transcribing
         if self.recording:
             self.recording = False
-            if self.stream:
-                self.stream.stop()
-                self.stream.close()
+            try:
+                if self.stream:
+                    self.stream.stop()
+                    self.stream.close()
+            except Exception:
+                pass
+            finally:
                 self.stream = None
             self.audio_data = []  # Discard audio
             self.update_tray('idle')
-        if self.main_window:
-            self.main_window.destroy()
-            self.main_window = None
+        
+        # Mark window as closed immediately so threads stop processing
+        mw = self.main_window
+        self.main_window = None
+        if mw:
+            try:
+                mw.destroy()
+            except Exception:
+                pass
     
     def clear_container(self):
+        if not self.main_window or not self.container.winfo_exists():
+            return
         for w in self.container.winfo_children():
             w.destroy()
     
@@ -221,7 +233,7 @@ class WhisperVoice:
                 font=('Arial', 18, 'bold'), bg='white', fg='#333').pack(pady=(0, 8))
         tk.Label(inner, text=f"Hotkey: {self.hotkey.upper()}",
                 font=('Arial', 10), bg='white', fg='#888').pack(pady=(0, 25))
-        self.make_button(inner, "🎙️ Aufnahme starten", self.start_recording, 'blue').pack()
+        self.make_button(inner, "Aufnahme starten", self.start_recording, 'blue').pack()
     
     def show_recording_state(self):
         self.clear_container()
@@ -239,7 +251,12 @@ class WhisperVoice:
                                    font=('Arial', 32, 'bold'), bg='white', fg='#333')
         self.time_label.pack(pady=(0, 25))
         
-        self.make_button(inner, "⏹️ Stoppen", self.stop_recording, 'red').pack()
+        # Button frame for Stop and Cancel
+        btn_frame = tk.Frame(inner, bg='white')
+        btn_frame.pack()
+        
+        self.make_button(btn_frame, "Stoppen", self.stop_recording, 'red').pack(side='left', padx=(0, 10))
+        self.make_button(btn_frame, "Abbrechen", self.close_main_window, 'gray').pack(side='left')
         
         self.update_timer()
         self.pulse_dot()
@@ -280,7 +297,27 @@ class WhisperVoice:
         tk.Label(header, text="Transkription abgeschlossen",
                 font=('Arial', 14, 'bold'), bg='white', fg='#333').pack(side='left')
         
-        # Text with scrollbar
+        # --- Bottom Buttons (Grid Layout for equal width) ---
+        btn_frame = tk.Frame(self.container, bg='white')
+        btn_frame.pack(side='bottom', fill='x', pady=20)
+        
+        # Configure 2 equal columns
+        btn_frame.grid_columnconfigure(0, weight=1)
+        btn_frame.grid_columnconfigure(1, weight=1)
+        
+        # New Recording
+        self.make_button(btn_frame, "Neue Aufnahme", self.show_ready_state, 'blue').grid(
+            row=0, column=0, padx=(0, 10), sticky='ew')
+            
+        # Copy Button (silent copy, no text change)
+        def copy():
+            self.main_window.clipboard_clear()
+            self.main_window.clipboard_append(text)
+        
+        copy_btn = self.make_button(btn_frame, "Text kopieren", copy, 'green')
+        copy_btn.grid(row=0, column=1, padx=(10, 0), sticky='ew')
+        
+        # --- Text Area (Fills remaining space) ---
         text_frame = tk.Frame(self.container, bg='#ddd')
         text_frame.pack(fill='both', expand=True, pady=(0, 15))
         
@@ -293,23 +330,6 @@ class WhisperVoice:
         self.result_text.pack(side='left', fill='both', expand=True)
         self.result_text.insert('1.0', text)
         scrollbar.config(command=self.result_text.yview)
-        
-        # Copy button below text
-        def copy():
-            self.main_window.clipboard_clear()
-            self.main_window.clipboard_append(text)
-            copy_btn.config(text="✓ Kopiert!")
-            self.main_window.after(1500, lambda: copy_btn.config(text="📋 Text kopieren"))
-        
-        copy_btn = self.make_button(self.container, "📋 Text kopieren", copy, 'green')
-        copy_btn.pack(pady=(10, 15))
-        
-        # Buttons row
-        btn_frame = tk.Frame(self.container, bg='white')
-        btn_frame.pack(fill='x', pady=(0, 10))
-        
-        self.make_button(btn_frame, "🔄 Neue Aufnahme", self.show_ready_state, 'blue').pack(side='left')
-        self.make_button(btn_frame, "✕ Schließen", self.close_main_window, 'gray').pack(side='right')
     
     def show_error_state(self, msg):
         self.clear_container()
@@ -402,9 +422,15 @@ class WhisperVoice:
             with open(tmp, 'rb') as f:
                 result = self.client.audio.transcriptions.create(
                     model="whisper-1", file=f, language="de")
+            
+            # If window was closed while transcribing, do nothing
+            if not self.main_window:
+                return
+
             self.root.after(0, lambda: self.show_result_state(result.text))
         except Exception as e:
-            self.root.after(0, lambda: self.show_error_state(str(e)))
+            if self.main_window: # Only show error if window is open
+                 self.root.after(0, lambda: self.show_error_state(str(e)))
         finally:
             if tmp:
                 try: os.unlink(tmp)
