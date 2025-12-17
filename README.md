@@ -34,10 +34,7 @@ Ein simples Windows 11 Tool für Voice-to-Text mit OpenAI Whisper API.
 pip install -r requirements.txt
 
 # 2. Build ausführen
-pyinstaller whisper_voice.spec
-
-# ODER einfach:
-build.bat
+python -m PyInstaller --clean --noconfirm whisper_voice.spec
 ```
 
 Die fertige `WhisperVoice.exe` liegt dann in `dist/`.

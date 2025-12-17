@@ -39,7 +39,7 @@ class WhisperVoice:
         self.start_time = None
         self.tray_icon = None
         self.stream = None
-        self.hotkey = 'ctrl+shift+r'
+        self.hotkey = 'ctrl+shift+e'
         self.main_window = None
         self.loading_angle = 0
         
@@ -145,7 +145,7 @@ class WhisperVoice:
             result['ok'] = True
             dlg.destroy()
         
-        self.make_button(btn_frame, "💾 Speichern", save, 'blue').pack(side='left', padx=(0, 15))
+        self.make_button(btn_frame, "Speichern", save, 'green').pack(side='left', padx=(0, 15))
         self.make_button(btn_frame, "Abbrechen", dlg.destroy, 'gray').pack(side='left')
         
         api_entry.focus_set()
@@ -154,17 +154,7 @@ class WhisperVoice:
     
     # ==================== TRAY ICON ====================
     def create_tray_icon(self, state='idle'):
-        size = 64
-        img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-        d = ImageDraw.Draw(img)
-        color = {'idle': '#666', 'recording': '#e53935', 'processing': '#1a73e8'}.get(state, '#666')
-        d.rounded_rectangle([20, 8, 44, 36], radius=8, fill=color)
-        d.arc([14, 22, 50, 50], 0, 180, fill=color, width=4)
-        d.line([32, 50, 32, 58], fill=color, width=4)
-        d.line([20, 58, 44, 58], fill=color, width=4)
-        if state == 'recording':
-            d.ellipse([48, 4, 60, 16], fill='red')
-        return img
+        return Image.open("icon.ico")
     
     def update_tray(self, state):
         if self.tray_icon:
@@ -421,7 +411,10 @@ class WhisperVoice:
                 w.writeframes(audio16.tobytes())
             with open(tmp, 'rb') as f:
                 result = self.client.audio.transcriptions.create(
-                    model="whisper-1", file=f, language="de")
+                    model="whisper-1",
+                    file=f,
+                    language="de"
+                )
             
             # If window was closed while transcribing, do nothing
             if not self.main_window:
