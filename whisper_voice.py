@@ -1,6 +1,5 @@
 """
-WhisperShroom - Simple Voice-to-Text Tool for Windows 11
-Large window (800x600), compact layout
+WhisperShroom - Voice-to-Text Tool for Windows 11
 """
 
 import os
@@ -16,15 +15,121 @@ import sounddevice as sd
 import numpy as np
 from openai import OpenAI
 import pystray
-from PIL import Image, ImageDraw
-import keyboard
+from PIL import Image
 import tkinter as tk
 from tkinter import messagebox
 import ctypes
+import ctypes.wintypes
+
+# Windows 11 native DPI awareness — use Per-Monitor V2 for crisp rendering
+# Must be called before any window creation (including tkinter.Tk)
+# See: https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE_V2
+except (AttributeError, OSError):
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except (AttributeError, OSError):
+        pass
 
 # Set Windows AppUserModelID so taskbar shows "WhisperShroom" instead of "Python"
-if sys.platform == 'win32':
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('shroomlife.whispershroom')
+# See: https://learn.microsoft.com/en-us/windows/win32/shell/appids
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('shroomlife.whispershroom')
+
+# ==================== NATIVE WINDOWS HOTKEY ====================
+MOD_ALT = 0x0001
+MOD_CTRL = 0x0002
+MOD_SHIFT = 0x0004
+MOD_WIN = 0x0008
+MOD_NOREPEAT = 0x4000
+WM_HOTKEY = 0x0312
+HOTKEY_ID = 1
+
+# Map modifier names to flags
+_MOD_MAP = {
+    'ctrl': MOD_CTRL, 'control': MOD_CTRL,
+    'alt': MOD_ALT, 'menu': MOD_ALT,
+    'shift': MOD_SHIFT,
+    'win': MOD_WIN, 'windows': MOD_WIN,
+}
+
+# Map key names to Windows virtual key codes
+_VK_MAP = {
+    'space': 0x20, 'enter': 0x0D, 'return': 0x0D, 'tab': 0x09,
+    'escape': 0x1B, 'esc': 0x1B, 'backspace': 0x08,
+    'delete': 0x2E, 'insert': 0x2D, 'home': 0x24, 'end': 0x23,
+    'pageup': 0x21, 'pagedown': 0x22, 'page up': 0x21, 'page down': 0x22,
+    'up': 0x26, 'down': 0x28, 'left': 0x25, 'right': 0x27,
+    'f1': 0x70, 'f2': 0x71, 'f3': 0x72, 'f4': 0x73,
+    'f5': 0x74, 'f6': 0x75, 'f7': 0x76, 'f8': 0x77,
+    'f9': 0x78, 'f10': 0x79, 'f11': 0x7A, 'f12': 0x7B,
+    'numpad0': 0x60, 'numpad1': 0x61, 'numpad2': 0x62, 'numpad3': 0x63,
+    'numpad4': 0x64, 'numpad5': 0x65, 'numpad6': 0x66, 'numpad7': 0x67,
+    'numpad8': 0x68, 'numpad9': 0x69,
+}
+
+
+def parse_hotkey(hotkey_str):
+    """Parse a hotkey string like 'ctrl+shift+r' into (modifiers, vk_code)."""
+    parts = [p.strip().lower() for p in hotkey_str.split('+')]
+    modifiers = MOD_NOREPEAT  # Prevent repeated firing when held
+    vk_code = 0
+
+    for part in parts:
+        if part in _MOD_MAP:
+            modifiers |= _MOD_MAP[part]
+        elif part in _VK_MAP:
+            vk_code = _VK_MAP[part]
+        elif len(part) == 1 and part.isalnum():
+            # Single letter/digit -> use its uppercase ASCII as VK code
+            vk_code = ord(part.upper())
+        else:
+            raise ValueError(f"Unbekannte Taste: '{part}'")
+
+    if vk_code == 0:
+        raise ValueError("Keine Taste angegeben (nur Modifier)")
+    return modifiers, vk_code
+
+
+class NativeHotkey:
+    """Registers a global hotkey using the Windows RegisterHotKey API."""
+
+    def __init__(self, hotkey_str, callback):
+        self.callback = callback
+        self._thread = None
+        self._thread_id = None
+        self._registered = False
+        self.hotkey_str = hotkey_str
+        self.modifiers, self.vk_code = parse_hotkey(hotkey_str)
+
+    def start(self):
+        """Register the hotkey and start listening in a background thread."""
+        self._thread = threading.Thread(target=self._listen, daemon=True)
+        self._thread.start()
+
+    def _listen(self):
+        self._thread_id = ctypes.windll.kernel32.GetCurrentThreadId()
+        if not ctypes.windll.user32.RegisterHotKey(None, HOTKEY_ID, self.modifiers, self.vk_code):
+            self._registered = False
+            return
+        self._registered = True
+        msg = ctypes.wintypes.MSG()
+        while ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+            if msg.message == WM_HOTKEY and msg.wParam == HOTKEY_ID:
+                self.callback()
+        # Cleanup when loop exits
+        ctypes.windll.user32.UnregisterHotKey(None, HOTKEY_ID)
+        self._registered = False
+
+    def stop(self):
+        """Unregister the hotkey and stop the listener thread."""
+        if self._thread_id:
+            # Post WM_QUIT to break the GetMessage loop
+            ctypes.windll.user32.PostThreadMessageW(self._thread_id, 0x0012, 0, 0)  # WM_QUIT
+            self._thread_id = None
+        if self._thread:
+            self._thread.join(timeout=2)
+            self._thread = None
 
 CONFIG_PATH = Path(os.environ.get('APPDATA', '.')) / 'WhisperShroom' / 'config.json'
 
@@ -36,9 +141,9 @@ def resource_path(relative_path):
     # Running as script
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
 
-# Window size - LARGE to account for DPI scaling
-WIN_W = 800
-WIN_H = 600
+# Window size — reasonable default; DPI awareness handles scaling natively
+WIN_W = 560
+WIN_H = 420
 
 
 class WhisperShroom:
@@ -54,7 +159,8 @@ class WhisperShroom:
         self.hotkey = 'ctrl+shift+e'
         self.main_window = None
         self.loading_angle = 0
-        
+        self._native_hotkey = None
+
         self.root = tk.Tk()
         self.root.withdraw()
         self.load_config()
@@ -62,18 +168,18 @@ class WhisperShroom:
     def load_config(self):
         if CONFIG_PATH.exists():
             try:
-                with open(CONFIG_PATH, 'r') as f:
+                with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                     self.api_key = config.get('api_key')
                     self.hotkey = config.get('hotkey', 'ctrl+shift+r')
                     if self.api_key:
                         self.client = OpenAI(api_key=self.api_key)
-            except:
+            except (OSError, json.JSONDecodeError, ValueError):
                 pass
     
     def save_config(self):
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(CONFIG_PATH, 'w') as f:
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
             json.dump({'api_key': self.api_key, 'hotkey': self.hotkey}, f)
     
     def center(self, win):
@@ -110,7 +216,7 @@ class WhisperShroom:
         dlg.grab_set()
         try:
             dlg.iconbitmap(resource_path('icon.ico'))
-        except:
+        except tk.TclError:
             pass
         self.center(dlg)
         
@@ -169,12 +275,12 @@ class WhisperShroom:
         return result['ok']
     
     # ==================== TRAY ICON ====================
-    def create_tray_icon(self, state='idle'):
+    def create_tray_icon(self):
         return Image.open(resource_path("icon.ico"))
-    
-    def update_tray(self, state):
+
+    def update_tray(self):
         if self.tray_icon:
-            self.tray_icon.icon = self.create_tray_icon(state)
+            self.tray_icon.icon = self.create_tray_icon()
     
     # ==================== MAIN WINDOW ====================
     def show_main_window(self):
@@ -190,7 +296,7 @@ class WhisperShroom:
         self.main_window.attributes('-topmost', True)
         try:
             self.main_window.iconbitmap(resource_path('icon.ico'))
-        except:
+        except tk.TclError:
             pass
         self.center(self.main_window)
         
@@ -214,7 +320,7 @@ class WhisperShroom:
             finally:
                 self.stream = None
             self.audio_data = []  # Discard audio
-            self.update_tray('idle')
+            self.update_tray()
         
         # Mark window as closed immediately so threads stop processing
         mw = self.main_window
@@ -364,16 +470,15 @@ class WhisperShroom:
         try:
             self.recording = True
             self.audio_data = []
-            self.start_time = time.time()
-            self.update_tray('recording')
+            self.start_time = time.monotonic()
+            self.update_tray()
             self.stream = sd.InputStream(samplerate=self.sample_rate, channels=1,
                                          dtype='float32', callback=self.audio_callback)
             self.stream.start()
-            self.root.after(0, self.show_main_window)
-            self.root.after(50, self.show_recording_state)
+            self.root.after(0, self._show_recording_window)
         except Exception as e:
             self.recording = False
-            self.update_tray('idle')
+            self.update_tray()
             self.root.after(0, lambda: self.show_error_state(str(e)))
     
     def stop_recording(self):
@@ -385,13 +490,18 @@ class WhisperShroom:
             self.stream.close()
             self.stream = None
         if self.audio_data:
-            self.update_tray('processing')
+            self.update_tray()
             self.root.after(0, self.show_loading_state)
             threading.Thread(target=self.transcribe, daemon=True).start()
         else:
-            self.update_tray('idle')
+            self.update_tray()
             self.root.after(0, self.show_ready_state)
     
+    def _show_recording_window(self):
+        """Show main window and immediately transition to recording state."""
+        self.show_main_window()
+        self.show_recording_state()
+
     def toggle_recording(self):
         if self.recording:
             self.root.after(0, self.stop_recording)
@@ -401,20 +511,20 @@ class WhisperShroom:
     def update_timer(self):
         if self.recording and hasattr(self, 'time_label') and self.time_label.winfo_exists():
             try:
-                elapsed = int(time.time() - self.start_time)
+                elapsed = int(time.monotonic() - self.start_time)
                 m, s = divmod(elapsed, 60)
                 self.time_label.config(text=f"{m:02d}:{s:02d}")
                 self.main_window.after(200, self.update_timer)
-            except:
+            except tk.TclError:
                 pass
-    
+
     def pulse_dot(self):
         if self.recording and hasattr(self, 'rec_dot') and self.rec_dot.winfo_exists():
             try:
                 c = self.rec_dot.cget('fg')
                 self.rec_dot.config(fg='white' if c == '#e53935' else '#e53935')
                 self.main_window.after(500, self.pulse_dot)
-            except:
+            except tk.TclError:
                 pass
     
     def transcribe(self):
@@ -446,26 +556,35 @@ class WhisperShroom:
                  self.root.after(0, lambda: self.show_error_state(str(e)))
         finally:
             if tmp:
-                try: os.unlink(tmp)
-                except: pass
-            self.update_tray('idle')
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+            self.update_tray()
     
     # ==================== SETTINGS / QUIT ====================
+    def _register_hotkey(self):
+        """Register the global hotkey using the native Windows API."""
+        if self._native_hotkey:
+            self._native_hotkey.stop()
+        self._native_hotkey = NativeHotkey(self.hotkey, self.toggle_recording)
+        self._native_hotkey.start()
+
     def open_settings(self):
         if self.show_setup_dialog():
-            keyboard.unhook_all()
-            keyboard.add_hotkey(self.hotkey, self.toggle_recording)
+            self._register_hotkey()
             if self.tray_icon:
                 self.tray_icon.title = f"WhisperShroom ({self.hotkey.upper()})"
-    
+
     def quit_app(self, *args):
         if self.recording:
             self.stop_recording()
-        keyboard.unhook_all()
+        if self._native_hotkey:
+            self._native_hotkey.stop()
         if self.tray_icon:
             self.tray_icon.stop()
         self.root.quit()
-        os._exit(0)
+        self.root.destroy()
     
     # ==================== RUN ====================
     def run(self):
@@ -473,7 +592,7 @@ class WhisperShroom:
             if not self.show_setup_dialog():
                 return
         
-        keyboard.add_hotkey(self.hotkey, self.toggle_recording)
+        self._register_hotkey()
         
         menu = pystray.Menu(
             pystray.MenuItem('Aufnahme starten/stoppen', lambda: self.toggle_recording()),
