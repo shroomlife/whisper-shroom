@@ -21,29 +21,81 @@ from tkinter import messagebox
 import ctypes
 import ctypes.wintypes
 
-# Windows 11 native DPI awareness — use Per-Monitor V2 for crisp rendering
-# Must be called before any window creation (including tkinter.Tk)
-# See: https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process
+# ==================== WIN32 API (x64-safe type declarations) ====================
+# Without explicit argtypes/restype, ctypes defaults to c_int (32-bit) for all
+# parameters and return values — this silently truncates handles and pointers on x64.
+# See: https://docs.python.org/3/library/ctypes.html#specifying-the-required-argument-types
+
+user32 = ctypes.windll.user32
+kernel32 = ctypes.windll.kernel32
+shell32 = ctypes.windll.shell32
+dwmapi = ctypes.windll.dwmapi
+
+# --- DPI Awareness (Win10 1703+ / Win11) ---
+# https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setprocessdpiawarenesscontext
+DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = ctypes.c_ssize_t(-4)
+user32.SetProcessDpiAwarenessContext.argtypes = [ctypes.c_ssize_t]
+user32.SetProcessDpiAwarenessContext.restype = ctypes.wintypes.BOOL
+
 try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE_V2
+    user32.SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
 except (AttributeError, OSError):
-    try:
-        ctypes.windll.user32.SetProcessDPIAware()
-    except (AttributeError, OSError):
-        pass
+    pass
 
-# Set Windows AppUserModelID so taskbar shows "WhisperShroom" instead of "Python"
-# See: https://learn.microsoft.com/en-us/windows/win32/shell/appids
-ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('shroomlife.whispershroom')
+# --- AppUserModelID ---
+# https://learn.microsoft.com/en-us/windows/win32/shell/appids
+shell32.SetCurrentProcessExplicitAppUserModelID.argtypes = [ctypes.c_wchar_p]
+shell32.SetCurrentProcessExplicitAppUserModelID.restype = ctypes.HRESULT
+shell32.SetCurrentProcessExplicitAppUserModelID('shroomlife.whispershroom')
 
-# ==================== NATIVE WINDOWS HOTKEY ====================
+# --- Hotkey API ---
+# https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey
+user32.RegisterHotKey.argtypes = [ctypes.wintypes.HWND, ctypes.c_int,
+                                  ctypes.wintypes.UINT, ctypes.wintypes.UINT]
+user32.RegisterHotKey.restype = ctypes.wintypes.BOOL
+
+user32.UnregisterHotKey.argtypes = [ctypes.wintypes.HWND, ctypes.c_int]
+user32.UnregisterHotKey.restype = ctypes.wintypes.BOOL
+
+# --- Message Loop ---
+user32.GetMessageW.argtypes = [ctypes.POINTER(ctypes.wintypes.MSG),
+                               ctypes.wintypes.HWND,
+                               ctypes.wintypes.UINT, ctypes.wintypes.UINT]
+user32.GetMessageW.restype = ctypes.wintypes.BOOL
+
+user32.PostThreadMessageW.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.UINT,
+                                      ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM]
+user32.PostThreadMessageW.restype = ctypes.wintypes.BOOL
+
+kernel32.GetCurrentThreadId.argtypes = []
+kernel32.GetCurrentThreadId.restype = ctypes.wintypes.DWORD
+
+# --- DWM Window Attributes (Win11 visual features) ---
+# https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/nf-dwmapi-dwmsetwindowattribute
+dwmapi.DwmSetWindowAttribute.argtypes = [ctypes.wintypes.HWND, ctypes.wintypes.DWORD,
+                                         ctypes.c_void_p, ctypes.wintypes.DWORD]
+dwmapi.DwmSetWindowAttribute.restype = ctypes.c_long  # HRESULT
+
+# Win32 constants
 MOD_ALT = 0x0001
 MOD_CTRL = 0x0002
 MOD_SHIFT = 0x0004
 MOD_WIN = 0x0008
 MOD_NOREPEAT = 0x4000
 WM_HOTKEY = 0x0312
+WM_QUIT = 0x0012
 HOTKEY_ID = 1
+DWMWA_WINDOW_CORNER_PREFERENCE = 33
+DWMWCP_ROUND = 2
+
+
+def apply_win11_style(hwnd):
+    """Apply native Win11 rounded corners to a window via DWM."""
+    preference = ctypes.wintypes.DWORD(DWMWCP_ROUND)
+    dwmapi.DwmSetWindowAttribute(
+        hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+        ctypes.byref(preference), ctypes.sizeof(preference)
+    )
 
 # Map modifier names to flags
 _MOD_MAP = {
@@ -108,24 +160,22 @@ class NativeHotkey:
         self._thread.start()
 
     def _listen(self):
-        self._thread_id = ctypes.windll.kernel32.GetCurrentThreadId()
-        if not ctypes.windll.user32.RegisterHotKey(None, HOTKEY_ID, self.modifiers, self.vk_code):
+        self._thread_id = kernel32.GetCurrentThreadId()
+        if not user32.RegisterHotKey(None, HOTKEY_ID, self.modifiers, self.vk_code):
             self._registered = False
             return
         self._registered = True
         msg = ctypes.wintypes.MSG()
-        while ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+        while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
             if msg.message == WM_HOTKEY and msg.wParam == HOTKEY_ID:
                 self.callback()
-        # Cleanup when loop exits
-        ctypes.windll.user32.UnregisterHotKey(None, HOTKEY_ID)
+        user32.UnregisterHotKey(None, HOTKEY_ID)
         self._registered = False
 
     def stop(self):
         """Unregister the hotkey and stop the listener thread."""
         if self._thread_id:
-            # Post WM_QUIT to break the GetMessage loop
-            ctypes.windll.user32.PostThreadMessageW(self._thread_id, 0x0012, 0, 0)  # WM_QUIT
+            user32.PostThreadMessageW(self._thread_id, WM_QUIT, 0, 0)
             self._thread_id = None
         if self._thread:
             self._thread.join(timeout=2)
@@ -198,7 +248,7 @@ class WhisperShroom:
         bg, hover, fg = colors.get(color, colors['blue'])
         
         btn = tk.Button(parent, text=text, command=cmd,
-                       font=('Arial', 11, 'bold'),
+                       font=('Segoe UI', 11, 'bold'),
                        bg=bg, fg=fg, activebackground=hover, activeforeground=fg,
                        relief='flat', bd=0, padx=20, pady=8, cursor='hand2')
         btn.bind('<Enter>', lambda e: btn.config(bg=hover))
@@ -219,6 +269,7 @@ class WhisperShroom:
         except tk.TclError:
             pass
         self.center(dlg)
+        apply_win11_style(dlg.winfo_id())
         
         result = {'ok': False}
         
@@ -228,25 +279,25 @@ class WhisperShroom:
         
         # Title
         tk.Label(content, text="🎤 WhisperShroom",
-                font=('Arial', 20, 'bold'), bg='white', fg='#333').pack(pady=(0, 5))
+                font=('Segoe UI', 20, 'bold'), bg='white', fg='#333').pack(pady=(0, 5))
         tk.Label(content, text="Voice-to-Text mit OpenAI Whisper",
-                font=('Arial', 10), bg='white', fg='#666').pack(pady=(0, 30))
+                font=('Segoe UI', 10), bg='white', fg='#666').pack(pady=(0, 30))
         
         # API Key
         tk.Label(content, text="OpenAI API Key:",
-                font=('Arial', 10, 'bold'), bg='white', fg='#333').pack(anchor='w')
+                font=('Segoe UI', 10, 'bold'), bg='white', fg='#333').pack(anchor='w')
         api_var = tk.StringVar(value=self.api_key or '')
-        api_entry = tk.Entry(content, textvariable=api_var, font=('Arial', 11),
+        api_entry = tk.Entry(content, textvariable=api_var, font=('Segoe UI', 11),
                             show='•', width=50, relief='solid', bd=1)
         api_entry.pack(pady=(5, 20), ipady=6)
         
         # Hotkey
         tk.Label(content, text="Tastenkombination:",
-                font=('Arial', 10, 'bold'), bg='white', fg='#333').pack(anchor='w')
+                font=('Segoe UI', 10, 'bold'), bg='white', fg='#333').pack(anchor='w')
         tk.Label(content, text="(z.B. ctrl+shift+r, alt+r, ctrl+space)",
-                font=('Arial', 9), bg='white', fg='#888').pack(anchor='w')
+                font=('Segoe UI', 9), bg='white', fg='#888').pack(anchor='w')
         hotkey_var = tk.StringVar(value=self.hotkey)
-        hotkey_entry = tk.Entry(content, textvariable=hotkey_var, font=('Arial', 11),
+        hotkey_entry = tk.Entry(content, textvariable=hotkey_var, font=('Segoe UI', 11),
                                width=50, relief='solid', bd=1)
         hotkey_entry.pack(pady=(5, 30), ipady=6)
         
@@ -299,6 +350,7 @@ class WhisperShroom:
         except tk.TclError:
             pass
         self.center(self.main_window)
+        apply_win11_style(self.main_window.winfo_id())
         
         # Container for content - centered
         self.container = tk.Frame(self.main_window, bg='white')
@@ -344,11 +396,11 @@ class WhisperShroom:
         inner = tk.Frame(self.container, bg='white')
         inner.place(relx=0.5, rely=0.5, anchor='center')
         
-        tk.Label(inner, text="🎤", font=('Arial', 48), bg='white').pack(pady=(0, 15))
+        tk.Label(inner, text="🎤", font=('Segoe UI', 48), bg='white').pack(pady=(0, 15))
         tk.Label(inner, text="Bereit zur Aufnahme",
-                font=('Arial', 18, 'bold'), bg='white', fg='#333').pack(pady=(0, 8))
+                font=('Segoe UI', 18, 'bold'), bg='white', fg='#333').pack(pady=(0, 8))
         tk.Label(inner, text=f"Hotkey: {self.hotkey.upper()}",
-                font=('Arial', 10), bg='white', fg='#888').pack(pady=(0, 25))
+                font=('Segoe UI', 10), bg='white', fg='#888').pack(pady=(0, 25))
         self.make_button(inner, "Aufnahme starten", self.start_recording, 'blue').pack()
     
     def show_recording_state(self):
@@ -357,14 +409,14 @@ class WhisperShroom:
         inner = tk.Frame(self.container, bg='white')
         inner.place(relx=0.5, rely=0.5, anchor='center')
         
-        self.rec_dot = tk.Label(inner, text="⏺", font=('Arial', 36), bg='white', fg='#e53935')
+        self.rec_dot = tk.Label(inner, text="⏺", font=('Segoe UI', 36), bg='white', fg='#e53935')
         self.rec_dot.pack(pady=(0, 10))
         
         tk.Label(inner, text="Aufnahme läuft...",
-                font=('Arial', 18, 'bold'), bg='white', fg='#333').pack(pady=(0, 15))
+                font=('Segoe UI', 18, 'bold'), bg='white', fg='#333').pack(pady=(0, 15))
         
         self.time_label = tk.Label(inner, text="00:00",
-                                   font=('Arial', 32, 'bold'), bg='white', fg='#333')
+                                   font=('Segoe UI', 32, 'bold'), bg='white', fg='#333')
         self.time_label.pack(pady=(0, 25))
         
         # Button frame for Stop and Cancel
@@ -387,7 +439,7 @@ class WhisperShroom:
         self.spinner.pack(pady=(0, 15))
         
         tk.Label(inner, text="Wird transkribiert...",
-                font=('Arial', 14, 'bold'), bg='white', fg='#333').pack()
+                font=('Segoe UI', 14, 'bold'), bg='white', fg='#333').pack()
         
         self.loading_angle = 0
         self.animate_spinner()
@@ -409,9 +461,9 @@ class WhisperShroom:
         # Header
         header = tk.Frame(self.container, bg='white')
         header.pack(fill='x', pady=(20, 15))
-        tk.Label(header, text="✅", font=('Arial', 20), bg='white').pack(side='left', padx=(0, 10))
+        tk.Label(header, text="✅", font=('Segoe UI', 20), bg='white').pack(side='left', padx=(0, 10))
         tk.Label(header, text="Transkription abgeschlossen",
-                font=('Arial', 14, 'bold'), bg='white', fg='#333').pack(side='left')
+                font=('Segoe UI', 14, 'bold'), bg='white', fg='#333').pack(side='left')
         
         # --- Bottom Buttons (Grid Layout for equal width) ---
         btn_frame = tk.Frame(self.container, bg='white')
@@ -440,7 +492,7 @@ class WhisperShroom:
         scrollbar = tk.Scrollbar(text_frame)
         scrollbar.pack(side='right', fill='y')
         
-        self.result_text = tk.Text(text_frame, wrap='word', font=('Arial', 11),
+        self.result_text = tk.Text(text_frame, wrap='word', font=('Segoe UI', 11),
                                    bg='#f9f9f9', fg='#333', relief='flat',
                                    padx=10, pady=10, yscrollcommand=scrollbar.set)
         self.result_text.pack(side='left', fill='both', expand=True)
@@ -453,9 +505,9 @@ class WhisperShroom:
         inner = tk.Frame(self.container, bg='white')
         inner.place(relx=0.5, rely=0.5, anchor='center')
         
-        tk.Label(inner, text="⚠️", font=('Arial', 36), bg='white').pack(pady=(0, 10))
-        tk.Label(inner, text="Fehler", font=('Arial', 14, 'bold'), bg='white', fg='#e53935').pack(pady=(0, 8))
-        tk.Label(inner, text=msg[:150], font=('Arial', 10), bg='white', fg='#666',
+        tk.Label(inner, text="⚠️", font=('Segoe UI', 36), bg='white').pack(pady=(0, 10))
+        tk.Label(inner, text="Fehler", font=('Segoe UI', 14, 'bold'), bg='white', fg='#e53935').pack(pady=(0, 8))
+        tk.Label(inner, text=msg[:150], font=('Segoe UI', 10), bg='white', fg='#666',
                 wraplength=400).pack(pady=(0, 20))
         self.make_button(inner, "🔄 Nochmal", self.show_ready_state, 'blue').pack()
     
