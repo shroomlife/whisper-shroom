@@ -1,75 +1,69 @@
 # WhisperShroom 🎤
 
-Ein simples Windows 11 Tool für Voice-to-Text mit OpenAI Whisper API.
+Ein natives Windows 11 Tool für Voice-to-Text mit OpenAI Whisper API. Gebaut mit WinUI 3 und .NET 10.
 
 ## Features
 
 - **System Tray Icon** - Läuft unauffällig im Hintergrund
-- **Hotkey** - `Ctrl+Shift+R` zum Starten/Stoppen der Aufnahme
+- **Globaler Hotkey** - Konfigurierbarer Hotkey (Standard: `Ctrl+Shift+E`)
 - **Echtzeit-Timer** - Zeigt die Aufnahmedauer an
+- **Silence Detection** - Warnung wenn kein Audiosignal erkannt wird
 - **Whisper API** - Nutzt OpenAIs modernste Spracherkennung
 - **Deutschsprachig** - Optimiert für deutsche Transkription
 - **Ein-Klick Kopieren** - Text direkt in die Zwischenablage
+- **Fluent Design** - Native Windows 11 UI mit Mica/Acrylic
+
+## Installation
+
+1. **Zertifikat installieren** (einmalig): Rechtsklick auf `WhisperShroom_Dev.cer` → "Zertifikat installieren" → "Lokaler Computer" → "Vertrauenswürdige Personen"
+2. **App installieren**: Doppelklick auf `WhisperShroom_x.x.x.x_x64.msix`
+3. **Update**: Einfach neue `.msix` doppelklicken - Windows updated automatisch
 
 ## Benutzung
 
-1. **Starten** - Doppelklick auf `WhisperShroom.exe`
+1. **Starten** - App aus dem Startmenü starten
 2. **API-Key** - Beim ersten Start OpenAI API-Key eingeben
-3. **Aufnehmen** - `Ctrl+Shift+R` drücken oder Tray-Icon klicken
-4. **Stoppen** - Nochmal `Ctrl+Shift+R` oder Stop-Button
-5. **Kopieren** - Text aus dem Ergebnis-Fenster kopieren
+3. **Aufnehmen** - Hotkey drücken oder Tray-Icon klicken
+4. **Stoppen** - Nochmal Hotkey oder Stop-Button
+5. **Kopieren** - "Text kopieren" Button oder Ctrl+C
 
-## Build (selbst kompilieren)
+## Build
 
 ### Voraussetzungen
 
 - Windows 10/11 (x64)
-- Python 3.10 oder höher
-- OpenAI API Key
+- .NET 10 SDK
+- Windows App SDK
 
 ### Build-Schritte
 
 ```bash
-# 1. Abhängigkeiten installieren
-pip install -r requirements.txt
+# Debug (unsigned)
+dotnet build src/WhisperShroom/WhisperShroom/WhisperShroom.csproj -p:Platform=x64 -p:AppxPackageSigningEnabled=false
 
-# 2. Build ausführen
-python -m PyInstaller --clean --noconfirm whisper_voice.spec
+# Release MSIX
+dotnet build src/WhisperShroom/WhisperShroom/WhisperShroom.csproj -c Release -p:Platform=x64
 ```
 
-Die fertige `WhisperShroom.exe` liegt dann in `dist/`.
+Die `.msix` liegt dann in `dist/`.
 
 ## Konfiguration
 
-Der API-Key wird gespeichert in:
 ```
 %APPDATA%\WhisperShroom\config.json
 ```
 
-Kann jederzeit über das Tray-Menü geändert werden.
+Kann jederzeit über das Tray-Menü → Einstellungen geändert werden.
 
-## Tastenkombination
+## Technologie
 
-| Hotkey | Aktion |
-|--------|--------|
-| `Ctrl+Shift+R` | Aufnahme starten/stoppen |
-
-## Hinweise
-
-- Das Tool nutzt das Standard-Mikrofon von Windows
-- Die Audioqualität ist auf 16kHz optimiert für Whisper
-- Die Transkription erfolgt auf Deutsch (`language="de"`)
-
-## Troubleshooting
-
-**"API-Key ungültig"**  
-→ Prüfe deinen OpenAI API-Key unter https://platform.openai.com/api-keys
-
-**"Kein Mikrofon gefunden"**  
-→ Stelle sicher, dass ein Mikrofon als Standard-Eingabegerät gesetzt ist
-
-**Antivirus blockiert**  
-→ PyInstaller-EXEs werden manchmal fälschlich erkannt, Ausnahme hinzufügen
+| Bereich | Technologie |
+|---------|------------|
+| UI Framework | WinUI 3 (Windows App SDK) |
+| Sprache | C# / .NET 10 |
+| Audio | NAudio (WASAPI) |
+| API | OpenAI Whisper |
+| Deployment | MSIX (Sideload) |
 
 ---
 

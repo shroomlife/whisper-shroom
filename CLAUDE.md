@@ -4,40 +4,88 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-WhisperShroom is a single-file Windows 11 voice-to-text app using OpenAI's Whisper API. It runs as a system tray application, records audio via a global hotkey, transcribes to German text, and displays results in a tkinter GUI.
+WhisperShroom is a native Windows 11 voice-to-text desktop app using OpenAI's Whisper API. Built with **WinUI 3** (Windows App SDK) and **.NET 10** in C#. It runs as a system tray application, records audio via a configurable global hotkey, transcribes to German text, and displays results in a native Fluent Design UI.
 
 ## Build & Run
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Restore NuGet packages
+dotnet restore src/WhisperShroom/WhisperShroom/WhisperShroom.csproj
 
-# Run directly
-python whisper_voice.py
+# Build (Debug, unsigned for local dev)
+dotnet build src/WhisperShroom/WhisperShroom/WhisperShroom.csproj -p:Platform=x64 -p:AppxPackageSigningEnabled=false
 
-# Build standalone EXE (output in dist/)
-python -m PyInstaller --clean --noconfirm whisper_voice.spec
+# Build MSIX (Release, signed with dev certificate)
+dotnet build src/WhisperShroom/WhisperShroom/WhisperShroom.csproj -c Release -p:Platform=x64
+
+# MSIX output: src/WhisperShroom/WhisperShroom/bin/x64/Release/.../AppPackages/
 ```
 
 There are no tests or linting configured.
 
 ## Architecture
 
-The entire app lives in **`whisper_voice.py`** (~600 lines). Key sections:
+The app follows **MVVM** (CommunityToolkit.Mvvm) with clearly separated layers:
 
-- **`NativeHotkey` class** — Registers global hotkeys via the Windows `RegisterHotKey` API (ctypes). Runs its own message loop in a daemon thread. This replaced the `keyboard` library for stability on recent Windows versions.
-- **`parse_hotkey()`** — Converts hotkey strings like `"ctrl+shift+r"` into Windows modifier flags + virtual key codes.
-- **`WhisperShroom` class** — The main application:
-  - **State machine UI**: `show_ready_state()` → `show_recording_state()` → `show_loading_state()` → `show_result_state()` / `show_error_state()`. All states render into a shared `self.container` frame.
-  - **Audio pipeline**: `sounddevice.InputStream` callback → numpy buffer → WAV temp file → OpenAI Whisper API → display result.
-  - **Threading**: Tray icon (`pystray`) runs in a daemon thread. Hotkey listener runs in its own thread. Transcription runs in a daemon thread. All UI updates marshal back to tkinter's main thread via `self.root.after()`.
-- **Config** is stored at `%APPDATA%\WhisperShroom\config.json` (API key + hotkey string).
-- **`whisper_voice.spec`** — PyInstaller spec for single-EXE build. Bundles `icon.ico` as a data file.
-- **`resource_path()`** — Resolves bundled resources in both dev mode and PyInstaller `_MEIPASS` mode.
+```
+src/WhisperShroom/WhisperShroom/
+  Program.cs              # Entry point, single-instance (AppLifecycle API)
+  App.xaml.cs             # Application init, static service references
+  Models/                 # AppState enum, AppConfig POCO, AudioDevice record
+  Services/
+    ConfigService.cs      # JSON config at %APPDATA%\WhisperShroom\config.json
+    AudioService.cs       # NAudio WasapiCapture, silence detection (RMS)
+    TranscriptionService.cs  # HttpClient -> OpenAI Whisper API
+    HotkeyService.cs      # Win32 RegisterHotKey via CsWin32 P/Invoke
+    HallucinationFilter.cs   # Known German Whisper hallucination strings
+  ViewModels/
+    MainViewModel.cs      # State machine (Ready/Recording/Loading/Result/Error)
+    SettingsViewModel.cs  # Settings dialog logic
+  Views/
+    MainWindow.xaml       # Window shell (always-on-top, 560x420)
+    MainPage.xaml         # 5 state panels, visibility-bound to CurrentState
+    SettingsDialog.xaml   # ContentDialog for API key, mic, hotkey
+  Helpers/
+    HotkeyParser.cs       # "ctrl+shift+e" -> Win32 modifier flags + VK code
+```
+
+### Key Technology Choices
+
+| Area | Technology | Why |
+|------|-----------|-----|
+| UI Framework | WinUI 3 (Windows App SDK) | Native Win11 Fluent Design |
+| MVVM | CommunityToolkit.Mvvm | Source-generated, AOT-compatible partial properties |
+| Audio | NAudio (WasapiCapture) | Direct WASAPI device enumeration, matches Win11 Sound Settings |
+| Global Hotkey | CsWin32 P/Invoke (RegisterHotKey) | Type-safe Win32 interop |
+| Tray Icon | H.NotifyIcon.WinUI | WinUI 3-compatible system tray |
+| OpenAI API | HttpClient (no SDK) | Single endpoint, minimal dependencies |
+| Deployment | MSIX packaged (sideloaded) | App identity for clipboard, proper install/update |
+
+### State Machine
+
+`AppState` enum drives UI visibility via `x:Bind`:
+`Ready` -> `Recording` (timer, pulsing dot, silence warning) -> `Loading` (ProgressRing) -> `Result` (text + copy) | `Error`
+
+### Threading Model
+
+- **UI thread**: WinUI 3 DispatcherQueue (main thread)
+- **Hotkey listener**: Dedicated background thread with Win32 GetMessage loop
+- **Audio capture**: NAudio callback thread, RMS computed per buffer
+- **Transcription**: `Task.Run` -> HttpClient async -> result dispatched to UI
 
 ## Key Conventions
 
 - UI language is German (labels, error messages, button text).
 - Transcription is hardcoded to German (`language="de"`).
-- All windows use `attributes('-topmost', True)` to stay on top.
+- Main window is always-on-top via `OverlappedPresenter.IsAlwaysOnTop`.
+- Window close hides to tray; "Beenden" exits the app.
 - The hotkey format in config uses `+`-separated lowercase tokens (e.g., `ctrl+shift+e`).
+- Config path: `%APPDATA%\WhisperShroom\config.json` (compatible with legacy Python version).
+- ViewModels use `partial property` pattern (not field-backed `[ObservableProperty]`) for WinRT AOT compatibility.
+
+## Versioning
+
+- Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
+- Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
+- Current version: **1.0.3.0**
+- Bump the version with every release build / bug fix round.

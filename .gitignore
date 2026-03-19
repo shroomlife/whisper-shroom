@@ -1,2 +1,20 @@
-/build
-/dist
+# .NET / C#
+**/bin/
+**/obj/
+*.user
+*.suo
+*.vs/
+.vs/
+*.DotSettings.user
+packages/
+
+# NuGet
+**/NuGet.Config
+
+# Build output
+**/publish/
+/dist/
+AppPackages/
+
+# MSIX signing
+*.pfx
