@@ -100,9 +100,8 @@
             </StackPanel>
 
             <ScrollViewer Grid.Row="1" Margin="0,0,0,16">
-                <TextBox Text="{x:Bind ViewModel.ResultText, Mode=OneWay}"
+                <TextBox Text="{x:Bind ViewModel.ResultText, Mode=TwoWay}"
                          TextWrapping="Wrap"
-                         IsReadOnly="True"
                          AcceptsReturn="True"
                          MinHeight="150"
                          Padding="12" />

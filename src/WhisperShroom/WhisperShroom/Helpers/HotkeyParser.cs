@@ -1,3 +1,5 @@
+using Windows.System;
+
 namespace WhisperShroom.Helpers;
 
 public static class HotkeyParser
@@ -34,6 +36,64 @@ public static class HotkeyParser
         ["numpad4"] = 0x64, ["numpad5"] = 0x65, ["numpad6"] = 0x66, ["numpad7"] = 0x67,
         ["numpad8"] = 0x68, ["numpad9"] = 0x69,
     };
+
+    private static readonly Dictionary<VirtualKey, string> VkToName = new()
+    {
+        [VirtualKey.Space] = "space", [VirtualKey.Enter] = "enter", [VirtualKey.Tab] = "tab",
+        [VirtualKey.Escape] = "escape", [VirtualKey.Back] = "backspace",
+        [VirtualKey.Delete] = "delete", [VirtualKey.Insert] = "insert",
+        [VirtualKey.Home] = "home", [VirtualKey.End] = "end",
+        [VirtualKey.PageUp] = "pageup", [VirtualKey.PageDown] = "pagedown",
+        [VirtualKey.Up] = "up", [VirtualKey.Down] = "down",
+        [VirtualKey.Left] = "left", [VirtualKey.Right] = "right",
+        [VirtualKey.F1] = "f1", [VirtualKey.F2] = "f2", [VirtualKey.F3] = "f3",
+        [VirtualKey.F4] = "f4", [VirtualKey.F5] = "f5", [VirtualKey.F6] = "f6",
+        [VirtualKey.F7] = "f7", [VirtualKey.F8] = "f8", [VirtualKey.F9] = "f9",
+        [VirtualKey.F10] = "f10", [VirtualKey.F11] = "f11", [VirtualKey.F12] = "f12",
+        [VirtualKey.NumberPad0] = "numpad0", [VirtualKey.NumberPad1] = "numpad1",
+        [VirtualKey.NumberPad2] = "numpad2", [VirtualKey.NumberPad3] = "numpad3",
+        [VirtualKey.NumberPad4] = "numpad4", [VirtualKey.NumberPad5] = "numpad5",
+        [VirtualKey.NumberPad6] = "numpad6", [VirtualKey.NumberPad7] = "numpad7",
+        [VirtualKey.NumberPad8] = "numpad8", [VirtualKey.NumberPad9] = "numpad9",
+    };
+
+    /// <summary>
+    /// Formats a hotkey from VirtualKey + modifier flags into the config string format (e.g. "ctrl+shift+e").
+    /// Returns null if the key is not a valid hotkey target.
+    /// </summary>
+    public static string? Format(VirtualKey key, bool ctrl, bool shift, bool alt, bool win)
+    {
+        // Must have at least one modifier
+        if (!ctrl && !shift && !alt && !win)
+            return null;
+
+        // Determine key name
+        string? keyName = null;
+        if (VkToName.TryGetValue(key, out var name))
+            keyName = name;
+        else if (key >= VirtualKey.A && key <= VirtualKey.Z)
+            keyName = ((char)('a' + (key - VirtualKey.A))).ToString();
+        else if (key >= VirtualKey.Number0 && key <= VirtualKey.Number9)
+            keyName = ((char)('0' + (key - VirtualKey.Number0))).ToString();
+
+        if (keyName is null)
+            return null;
+
+        var parts = new List<string>(4);
+        if (ctrl) parts.Add("ctrl");
+        if (alt) parts.Add("alt");
+        if (shift) parts.Add("shift");
+        if (win) parts.Add("win");
+        parts.Add(keyName);
+
+        return string.Join('+', parts);
+    }
+
+    public static bool IsModifier(VirtualKey key) =>
+        key is VirtualKey.Control or VirtualKey.LeftControl or VirtualKey.RightControl
+            or VirtualKey.Shift or VirtualKey.LeftShift or VirtualKey.RightShift
+            or VirtualKey.Menu or VirtualKey.LeftMenu or VirtualKey.RightMenu
+            or VirtualKey.LeftWindows or VirtualKey.RightWindows;
 
     public static (uint Modifiers, uint VkCode) Parse(string hotkeyStr)
     {

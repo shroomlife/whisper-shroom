@@ -33,8 +33,12 @@
 
             <TextBox x:Name="HotkeyBox"
                      Header="Tastenkombination"
-                     PlaceholderText="z.B. ctrl+shift+r, alt+r, ctrl+space"
-                     Text="{x:Bind ViewModel.Hotkey, Mode=TwoWay}" />
+                     PlaceholderText="Klicken und Tastenkombination drücken"
+                     Text="{x:Bind ViewModel.Hotkey, Mode=TwoWay}"
+                     IsReadOnly="True"
+                     GotFocus="HotkeyBox_GotFocus"
+                     LostFocus="HotkeyBox_LostFocus"
+                     PreviewKeyDown="HotkeyBox_PreviewKeyDown" />
 
             <InfoBar x:Name="ErrorInfo"
                      IsOpen="False"
