@@ -3,3 +3,4 @@ UnregisterHotKey
 GetMessageW
 PostThreadMessageW
 GetCurrentThreadId
+GetCursorPos

@@ -1,9 +1,11 @@
 using CommunityToolkit.Mvvm.Input;
 using H.NotifyIcon;
+using H.NotifyIcon.Core;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.Win32;
 using WinRT.Interop;
 
 namespace WhisperShroom.Views;
@@ -68,6 +70,15 @@ public sealed partial class MainWindow : Window
         _trayIcon.DoubleClickCommand = new RelayCommand(() =>
         {
             DispatcherQueue.TryEnqueue(ShowAndActivate);
+        });
+
+        // Disable automatic context menu — position it manually at cursor
+        _trayIcon.MenuActivation = PopupActivationMode.None;
+        _trayIcon.RightClickCommand = new RelayCommand(() =>
+        {
+            PInvoke.GetCursorPos(out var point);
+            _trayIcon.ShowContextMenu(
+                new System.Drawing.Point(point.X, point.Y));
         });
 
         // Context menu via MenuFlyout
