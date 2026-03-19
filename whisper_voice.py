@@ -207,6 +207,8 @@ class WhisperShroom:
         self.tray_icon = None
         self.stream = None
         self.hotkey = 'ctrl+shift+e'
+        self.device_index = None  # None = system default
+        self.device_name = None   # Stored in config for robustness
         self.main_window = None
         self.loading_angle = 0
         self._native_hotkey = None
@@ -222,15 +224,33 @@ class WhisperShroom:
                     config = json.load(f)
                     self.api_key = config.get('api_key')
                     self.hotkey = config.get('hotkey', 'ctrl+shift+r')
+                    self.device_name = config.get('device_name')
+                    self.device_index = self._resolve_device_index(self.device_name)
                     if self.api_key:
                         self.client = OpenAI(api_key=self.api_key)
             except (OSError, json.JSONDecodeError, ValueError):
                 pass
     
+    def _resolve_device_index(self, name):
+        """Resolve a device name to its current PortAudio index, or None."""
+        if not name:
+            return None
+        try:
+            for idx, dev_name in self._get_input_devices():
+                if dev_name == name:
+                    return idx
+        except Exception:
+            pass
+        return None
+
     def save_config(self):
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-            json.dump({'api_key': self.api_key, 'hotkey': self.hotkey}, f)
+            json.dump({
+                'api_key': self.api_key,
+                'hotkey': self.hotkey,
+                'device_name': self.device_name,
+            }, f)
     
     def center(self, win):
         win.update_idletasks()
@@ -256,10 +276,37 @@ class WhisperShroom:
         return btn
     
     # ==================== SETUP DIALOG ====================
+    def _get_input_devices(self):
+        """Return list of (device_index, device_name) for physical input devices.
+
+        Filters to Windows WASAPI host API only, which matches the devices
+        shown in Windows Sound Settings (1:1 mapping to physical endpoints).
+        Falls back to all input devices if WASAPI is not available.
+        """
+        devices = sd.query_devices()
+        hostapis = sd.query_hostapis()
+
+        # Find the WASAPI host API index
+        wasapi_idx = None
+        for i, api in enumerate(hostapis):
+            if 'WASAPI' in api['name']:
+                wasapi_idx = i
+                break
+
+        inputs = []
+        for i, d in enumerate(devices):
+            if d['max_input_channels'] <= 0:
+                continue
+            # If WASAPI found, only include WASAPI devices
+            if wasapi_idx is not None and d['hostapi'] != wasapi_idx:
+                continue
+            inputs.append((i, d['name']))
+        return inputs
+
     def show_setup_dialog(self):
         dlg = tk.Toplevel(self.root)
         dlg.title("WhisperShroom - Einstellungen")
-        dlg.geometry(f"{WIN_W}x{WIN_H}")
+        dlg.geometry(f"{WIN_W}x{WIN_H + 80}")
         dlg.resizable(False, False)
         dlg.configure(bg='white')
         dlg.attributes('-topmost', True)
@@ -270,27 +317,50 @@ class WhisperShroom:
             pass
         self.center(dlg)
         apply_win11_style(dlg.winfo_id())
-        
+
         result = {'ok': False}
-        
+
         # Content frame - centered
         content = tk.Frame(dlg, bg='white')
         content.place(relx=0.5, rely=0.5, anchor='center')
-        
+
         # Title
         tk.Label(content, text="🎤 WhisperShroom",
                 font=('Segoe UI', 20, 'bold'), bg='white', fg='#333').pack(pady=(0, 5))
         tk.Label(content, text="Voice-to-Text mit OpenAI Whisper",
-                font=('Segoe UI', 10), bg='white', fg='#666').pack(pady=(0, 30))
-        
+                font=('Segoe UI', 10), bg='white', fg='#666').pack(pady=(0, 20))
+
         # API Key
         tk.Label(content, text="OpenAI API Key:",
                 font=('Segoe UI', 10, 'bold'), bg='white', fg='#333').pack(anchor='w')
         api_var = tk.StringVar(value=self.api_key or '')
         api_entry = tk.Entry(content, textvariable=api_var, font=('Segoe UI', 11),
                             show='•', width=50, relief='solid', bd=1)
-        api_entry.pack(pady=(5, 20), ipady=6)
-        
+        api_entry.pack(pady=(5, 15), ipady=6)
+
+        # Mikrofon
+        input_devices = self._get_input_devices()
+        device_names = ["Standard-Gerät"] + [d[1] for d in input_devices]
+        device_indices = [None] + [d[0] for d in input_devices]
+
+        tk.Label(content, text="Mikrofon:",
+                font=('Segoe UI', 10, 'bold'), bg='white', fg='#333').pack(anchor='w')
+
+        # Find current selection
+        current_device_name = "Standard-Gerät"
+        if self.device_name is not None:
+            for idx, name in input_devices:
+                if name == self.device_name:
+                    current_device_name = name
+                    break
+
+        from tkinter import ttk
+        device_var = tk.StringVar(value=current_device_name)
+        device_combo = ttk.Combobox(content, textvariable=device_var,
+                                     values=device_names, state='readonly',
+                                     font=('Segoe UI', 10), width=48)
+        device_combo.pack(pady=(5, 15), ipady=4)
+
         # Hotkey
         tk.Label(content, text="Tastenkombination:",
                 font=('Segoe UI', 10, 'bold'), bg='white', fg='#333').pack(anchor='w')
@@ -299,12 +369,12 @@ class WhisperShroom:
         hotkey_var = tk.StringVar(value=self.hotkey)
         hotkey_entry = tk.Entry(content, textvariable=hotkey_var, font=('Segoe UI', 11),
                                width=50, relief='solid', bd=1)
-        hotkey_entry.pack(pady=(5, 30), ipady=6)
-        
+        hotkey_entry.pack(pady=(5, 25), ipady=6)
+
         # Buttons
         btn_frame = tk.Frame(content, bg='white')
         btn_frame.pack()
-        
+
         def save():
             key = api_var.get().strip()
             hk = hotkey_var.get().strip().lower() or 'ctrl+shift+r'
@@ -313,14 +383,22 @@ class WhisperShroom:
                 return
             self.api_key = key
             self.hotkey = hk
+            # Resolve selected device
+            selected_name = device_var.get()
+            if selected_name == "Standard-Gerät":
+                self.device_name = None
+                self.device_index = None
+            else:
+                self.device_name = selected_name
+                self.device_index = self._resolve_device_index(selected_name)
             self.client = OpenAI(api_key=self.api_key)
             self.save_config()
             result['ok'] = True
             dlg.destroy()
-        
+
         self.make_button(btn_frame, "Speichern", save, 'green').pack(side='left', padx=(0, 15))
         self.make_button(btn_frame, "Abbrechen", dlg.destroy, 'gray').pack(side='left')
-        
+
         api_entry.focus_set()
         dlg.wait_window()
         return result['ok']
@@ -425,9 +503,14 @@ class WhisperShroom:
         
         self.make_button(btn_frame, "Stoppen", self.stop_recording, 'red').pack(side='left', padx=(0, 10))
         self.make_button(btn_frame, "Abbrechen", self.close_main_window, 'gray').pack(side='left')
-        
+
+        # Silence warning (hidden initially)
+        self.silence_label = tk.Label(inner, text="Kein Audiosignal erkannt.\nBitte Mikrofon prüfen.",
+                                      font=('Segoe UI', 9), bg='white', fg='#e53935')
+
         self.update_timer()
         self.pulse_dot()
+        self.check_silence()
     
     def show_loading_state(self):
         self.clear_container()
@@ -515,6 +598,10 @@ class WhisperShroom:
     def audio_callback(self, indata, frames, time_info, status):
         if self.recording:
             self.audio_data.append(indata.copy())
+            # Track whether we've seen any real audio
+            rms = float(np.sqrt(np.mean(indata ** 2)))
+            if rms > 0.005:
+                self._has_audio = True
     
     def start_recording(self):
         if self.recording:
@@ -522,10 +609,13 @@ class WhisperShroom:
         try:
             self.recording = True
             self.audio_data = []
+            self._has_audio = False
+            self._silence_warned = False
             self.start_time = time.monotonic()
             self.update_tray()
             self.stream = sd.InputStream(samplerate=self.sample_rate, channels=1,
-                                         dtype='float32', callback=self.audio_callback)
+                                         dtype='float32', callback=self.audio_callback,
+                                         device=self.device_index)
             self.stream.start()
             self.root.after(0, self._show_recording_window)
         except Exception as e:
@@ -570,6 +660,24 @@ class WhisperShroom:
             except tk.TclError:
                 pass
 
+    def check_silence(self):
+        if not self.recording or not self.main_window:
+            return
+        if not hasattr(self, 'silence_label') or not self.silence_label.winfo_exists():
+            return
+        try:
+            elapsed = time.monotonic() - self.start_time
+            if elapsed >= 5 and not self._has_audio and not self._silence_warned:
+                # Show warning
+                self._silence_warned = True
+                self.silence_label.pack(pady=(10, 0))
+            elif self._has_audio and self._silence_warned:
+                # Audio detected, hide warning
+                self.silence_label.pack_forget()
+            self.main_window.after(500, self.check_silence)
+        except tk.TclError:
+            pass
+
     def pulse_dot(self):
         if self.recording and hasattr(self, 'rec_dot') and self.rec_dot.winfo_exists():
             try:
@@ -579,10 +687,39 @@ class WhisperShroom:
             except tk.TclError:
                 pass
     
+    # Known Whisper hallucination strings (appear on silent/near-silent audio)
+    _HALLUCINATIONS = {
+        "untertitel der amara.org-community",
+        "untertitel von der amara.org-community",
+        "untertitel im auftrag des zdf für funk, 2017",
+        "untertitel im auftrag des zdf, 2017",
+        "untertitel im auftrag des zdf, 2020",
+        "swr 2020",
+        "swr 2021",
+        "copyright wdr 2020",
+        "copyright wdr 2021",
+        "vielen dank fürs zuschauen!",
+        "vielen dank für's zuschauen!",
+        "bis zum nächsten mal!",
+        "danke fürs zuschauen!",
+        "danke für's zuschauen!",
+        "tschüss!",
+    }
+
     def transcribe(self):
         tmp = None
         try:
             audio = np.concatenate(self.audio_data, axis=0)
+
+            # Silence detection — reject audio that's too quiet to contain speech
+            rms = float(np.sqrt(np.mean(audio ** 2)))
+            if rms < 0.005:
+                if self.main_window:
+                    self.root.after(0, lambda: self.show_error_state(
+                        "Kein Audio erkannt. Bitte prüfe dein Mikrofon "
+                        "in den Einstellungen."))
+                return
+
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
                 tmp = f.name
             audio16 = (audio * 32767).astype(np.int16)
@@ -597,12 +734,20 @@ class WhisperShroom:
                     file=f,
                     language="de"
                 )
-            
+
             # If window was closed while transcribing, do nothing
             if not self.main_window:
                 return
 
-            self.root.after(0, lambda: self.show_result_state(result.text))
+            # Filter known Whisper hallucinations
+            text = result.text.strip()
+            if text.lower().rstrip('.') in self._HALLUCINATIONS:
+                self.root.after(0, lambda: self.show_error_state(
+                    "Kein Audio erkannt. Bitte prüfe dein Mikrofon "
+                    "in den Einstellungen."))
+                return
+
+            self.root.after(0, lambda: self.show_result_state(text))
         except Exception as e:
             if self.main_window: # Only show error if window is open
                  self.root.after(0, lambda: self.show_error_state(str(e)))
@@ -639,24 +784,60 @@ class WhisperShroom:
         self.root.destroy()
     
     # ==================== RUN ====================
+    def _build_device_menu(self):
+        """Build a submenu of input devices for the tray icon."""
+        input_devices = self._get_input_devices()
+        items = []
+
+        def make_select(dev_name, dev_idx):
+            def select():
+                self.device_name = dev_name
+                self.device_index = dev_idx
+                self.save_config()
+                self._rebuild_tray_menu()
+            return select
+
+        # "Standard-Gerät" option
+        items.append(pystray.MenuItem(
+            'Standard-Gerät',
+            make_select(None, None),
+            checked=lambda item: self.device_name is None,
+        ))
+
+        for idx, name in input_devices:
+            items.append(pystray.MenuItem(
+                name,
+                make_select(name, idx),
+                checked=lambda item, dn=name: self.device_name == dn,
+            ))
+
+        return pystray.Menu(*items)
+
+    def _build_tray_menu(self):
+        return pystray.Menu(
+            pystray.MenuItem('Aufnahme starten/stoppen', lambda: self.toggle_recording()),
+            pystray.MenuItem(f'Hotkey: {self.hotkey.upper()}', lambda: None, enabled=False),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem('Mikrofon', self._build_device_menu()),
+            pystray.MenuItem('Einstellungen', lambda: self.root.after(0, self.open_settings)),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem('Beenden', self.quit_app),
+        )
+
+    def _rebuild_tray_menu(self):
+        if self.tray_icon:
+            self.tray_icon.menu = self._build_tray_menu()
+
     def run(self):
         if not self.api_key:
             if not self.show_setup_dialog():
                 return
-        
+
         self._register_hotkey()
-        
-        menu = pystray.Menu(
-            pystray.MenuItem('Aufnahme starten/stoppen', lambda: self.toggle_recording()),
-            pystray.MenuItem(f'Hotkey: {self.hotkey.upper()}', lambda: None, enabled=False),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem('Einstellungen', lambda: self.root.after(0, self.open_settings)),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem('Beenden', self.quit_app)
-        )
-        
+
         self.tray_icon = pystray.Icon("WhisperShroom", self.create_tray_icon(),
-                                      f"WhisperShroom ({self.hotkey.upper()})", menu)
+                                      f"WhisperShroom ({self.hotkey.upper()})",
+                                      self._build_tray_menu())
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
         self.root.mainloop()
 
