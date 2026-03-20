@@ -3,9 +3,3 @@ UnregisterHotKey
 GetMessageW
 PostThreadMessageW
 GetCurrentThreadId
-GetCursorPos
-CreatePopupMenu
-AppendMenu
-TrackPopupMenuEx
-DestroyMenu
-SetForegroundWindow

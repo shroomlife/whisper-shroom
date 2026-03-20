@@ -4,8 +4,7 @@ using H.NotifyIcon.Core;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
-using Windows.Win32;
-using Windows.Win32.UI.WindowsAndMessaging;
+using WhisperShroom.Helpers;
 using WinRT.Interop;
 
 namespace WhisperShroom.Views;
@@ -92,71 +91,69 @@ public sealed partial class MainWindow : Window
 
     private void ShowNativeContextMenu()
     {
-        var hWnd = new Windows.Win32.Foundation.HWND(WindowNative.GetWindowHandle(this));
-        PInvoke.GetCursorPos(out var cursorPos);
+        var hWnd = WindowNative.GetWindowHandle(this);
+        NativeMenu.GetCursorPos(out var cursorPos);
 
-        var hMenu = PInvoke.CreatePopupMenu();
-        if (hMenu.IsNull) return;
+        var hMenu = NativeMenu.CreatePopupMenu();
+        if (hMenu == 0) return;
 
         try
         {
-            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_STRING,
+            NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING,
                 MenuId_ToggleRecording, "Aufnahme starten/stoppen");
 
-            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
+            NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_SEPARATOR, 0, null);
 
             var hotkey = App.ConfigService.Config.Hotkey.ToUpperInvariant();
-            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_STRING | MENU_ITEM_FLAGS.MF_GRAYED,
+            NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING | NativeMenu.MF_GRAYED,
                 0, $"Hotkey: {hotkey}");
 
-            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
+            NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_SEPARATOR, 0, null);
 
             // Microphone submenu
-            var hMicMenu = PInvoke.CreatePopupMenu();
+            var hMicMenu = NativeMenu.CreatePopupMenu();
             var devices = App.AudioService.GetInputDevices();
             var currentDevice = App.ConfigService.Config.DeviceName;
 
-            var defaultFlags = MENU_ITEM_FLAGS.MF_STRING;
-            if (currentDevice is null) defaultFlags |= MENU_ITEM_FLAGS.MF_CHECKED;
-            PInvoke.AppendMenu(hMicMenu, defaultFlags, MenuId_DefaultDevice, "Standard-Gerät");
+            var defaultFlags = NativeMenu.MF_STRING;
+            if (currentDevice is null) defaultFlags |= NativeMenu.MF_CHECKED;
+            NativeMenu.AppendMenuW(hMicMenu, defaultFlags, MenuId_DefaultDevice, "Standard-Gerät");
 
             uint deviceId = MenuId_DeviceBase;
             foreach (var device in devices)
             {
-                var flags = MENU_ITEM_FLAGS.MF_STRING;
-                if (device.Name == currentDevice) flags |= MENU_ITEM_FLAGS.MF_CHECKED;
-                PInvoke.AppendMenu(hMicMenu, flags, deviceId, device.Name);
+                var flags = NativeMenu.MF_STRING;
+                if (device.Name == currentDevice) flags |= NativeMenu.MF_CHECKED;
+                NativeMenu.AppendMenuW(hMicMenu, flags, deviceId, device.Name);
                 deviceId++;
             }
 
-            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_POPUP,
-                (nuint)hMicMenu.Value, "Mikrofon");
+            NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_POPUP,
+                (nuint)hMicMenu, "Mikrofon");
 
-            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_STRING,
+            NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING,
                 MenuId_Settings, "Einstellungen");
 
-            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
+            NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_SEPARATOR, 0, null);
 
-            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_STRING,
+            NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING,
                 MenuId_Quit, "Beenden");
 
             // Required so the menu dismisses when clicking outside
-            PInvoke.SetForegroundWindow(hWnd);
+            NativeMenu.SetForegroundWindow(hWnd);
 
-            var tpmFlags = TRACK_POPUP_MENU_FLAGS.TPM_RETURNCMD
-                         | TRACK_POPUP_MENU_FLAGS.TPM_BOTTOMALIGN;
-            var result = PInvoke.TrackPopupMenuEx(hMenu, (uint)tpmFlags,
-                cursorPos.X, cursorPos.Y, hWnd);
+            var cmd = NativeMenu.TrackPopupMenuEx(hMenu,
+                NativeMenu.TPM_RETURNCMD | NativeMenu.TPM_BOTTOMALIGN,
+                cursorPos.X, cursorPos.Y, hWnd, 0);
 
-            if (result)
+            if (cmd != 0)
             {
-                var selectedId = (uint)result.Value;
-                DispatcherQueue.TryEnqueue(() => HandleMenuCommand(selectedId, devices));
+                DispatcherQueue.TryEnqueue(() => HandleMenuCommand((uint)cmd, devices));
             }
         }
         finally
         {
-            PInvoke.DestroyMenu(hMenu);
+            NativeMenu.DestroyMenu(hMenu);
         }
     }
 

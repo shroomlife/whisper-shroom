@@ -47,6 +47,7 @@ src/WhisperShroom/WhisperShroom/
     SettingsDialog.xaml   # ContentDialog for API key, mic, hotkey
   Helpers/
     HotkeyParser.cs       # "ctrl+shift+e" -> Win32 modifier flags + VK code
+    NativeMenu.cs         # Manual P/Invoke for Win32 popup menus (CreatePopupMenu, TrackPopupMenuEx)
 ```
 
 ### Key Technology Choices
@@ -57,7 +58,8 @@ src/WhisperShroom/WhisperShroom/
 | MVVM | CommunityToolkit.Mvvm | Source-generated, AOT-compatible partial properties |
 | Audio | NAudio (WasapiCapture) | Direct WASAPI device enumeration, matches Win11 Sound Settings |
 | Global Hotkey | CsWin32 P/Invoke (RegisterHotKey) | Type-safe Win32 interop |
-| Tray Icon | H.NotifyIcon.WinUI | WinUI 3-compatible system tray |
+| Tray Icon | H.NotifyIcon.WinUI | WinUI 3-compatible system tray (icon + click detection only) |
+| Tray Context Menu | Win32 TrackPopupMenuEx (manual P/Invoke) | H.NotifyIcon's menu modes have positioning/sizing bugs |
 | OpenAI API | HttpClient (no SDK) | Single endpoint, minimal dependencies |
 | Deployment | MSIX packaged (sideloaded) | App identity for clipboard, proper install/update |
 
@@ -87,5 +89,5 @@ src/WhisperShroom/WhisperShroom/
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.0.6.0**
+- Current version: **1.0.7.0**
 - Bump the version with every release build / bug fix round.
