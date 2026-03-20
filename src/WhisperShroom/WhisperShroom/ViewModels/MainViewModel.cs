@@ -116,7 +116,7 @@ public partial class MainViewModel : ObservableObject
             var apiKey = App.ConfigService.Config.ApiKey;
             if (string.IsNullOrEmpty(apiKey))
             {
-                ErrorMessage = "API-Key nicht konfiguriert.";
+                ErrorMessage = "API key not configured.";
                 CurrentState = AppState.Error;
                 return;
             }
@@ -128,7 +128,7 @@ public partial class MainViewModel : ObservableObject
 
             if (HallucinationFilter.IsHallucination(trimmed))
             {
-                ErrorMessage = "Kein Audio erkannt. Bitte prüfe dein Mikrofon in den Einstellungen.";
+                ErrorMessage = "No audio detected. Please check your microphone in Settings.";
                 CurrentState = AppState.Error;
                 return;
             }

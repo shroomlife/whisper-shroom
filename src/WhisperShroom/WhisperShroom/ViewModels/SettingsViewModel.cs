@@ -25,11 +25,11 @@ public partial class SettingsViewModel : ObservableObject
 
         // Load devices
         var devices = App.AudioService.GetInputDevices();
-        DeviceNames = ["Standard-Gerät", .. devices.Select(d => d.Name)];
+        DeviceNames = ["Default Device", .. devices.Select(d => d.Name)];
 
         SelectedDeviceName = config.DeviceName is not null && DeviceNames.Contains(config.DeviceName)
             ? config.DeviceName
-            : "Standard-Gerät";
+            : "Default Device";
     }
 
     public bool Save()
@@ -51,7 +51,7 @@ public partial class SettingsViewModel : ObservableObject
         var config = App.ConfigService.Config;
         config.ApiKey = ApiKey.Trim();
         config.Hotkey = hk;
-        config.DeviceName = SelectedDeviceName == "Standard-Gerät" ? null : SelectedDeviceName;
+        config.DeviceName = SelectedDeviceName == "Default Device" ? null : SelectedDeviceName;
 
         App.ConfigService.Save();
 

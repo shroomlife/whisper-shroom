@@ -7,7 +7,7 @@
 
   <Identity Name="WhisperShroom"
             Publisher="CN=WhisperShroom Dev"
-            Version="1.0.7.0"
+            Version="1.1.0.0"
             ProcessorArchitecture="x64" />
 
   <Properties>
@@ -32,7 +32,7 @@
                  EntryPoint="$targetentrypoint$">
       <uap:VisualElements
         DisplayName="WhisperShroom"
-        Description="Voice-to-Text mit OpenAI Whisper"
+        Description="Voice-to-Text powered by OpenAI Whisper"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">

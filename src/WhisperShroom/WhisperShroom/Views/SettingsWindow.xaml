@@ -3,7 +3,7 @@
     x:Class="WhisperShroom.Views.SettingsWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="WhisperShroom - Einstellungen">
+    Title="WhisperShroom - Settings">
 
     <Grid Padding="32" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
@@ -12,12 +12,12 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Text="WhisperShroom - Einstellungen"
+        <TextBlock Text="WhisperShroom - Settings"
                    Style="{StaticResource TitleTextBlockStyle}"
                    Margin="0,0,0,8" />
 
         <StackPanel Grid.Row="1" Spacing="16">
-            <TextBlock Text="Voice-to-Text mit OpenAI Whisper"
+            <TextBlock Text="Voice-to-Text powered by OpenAI Whisper"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
             <PasswordBox x:Name="ApiKeyBox"
@@ -26,14 +26,14 @@
                          Password="{x:Bind ViewModel.ApiKey, Mode=TwoWay}" />
 
             <ComboBox x:Name="DeviceCombo"
-                      Header="Mikrofon"
+                      Header="Microphone"
                       ItemsSource="{x:Bind ViewModel.DeviceNames, Mode=OneWay}"
                       SelectedItem="{x:Bind ViewModel.SelectedDeviceName, Mode=TwoWay}"
                       HorizontalAlignment="Stretch" />
 
             <TextBox x:Name="HotkeyBox"
-                     Header="Tastenkombination"
-                     PlaceholderText="Klicken und Tastenkombination drücken"
+                     Header="Hotkey"
+                     PlaceholderText="Click and press a key combination"
                      Text="{x:Bind ViewModel.Hotkey, Mode=TwoWay}"
                      IsReadOnly="True"
                      GotFocus="HotkeyBox_GotFocus"
@@ -43,18 +43,18 @@
             <InfoBar x:Name="ErrorInfo"
                      IsOpen="False"
                      Severity="Error"
-                     Title="Fehler"
+                     Title="Error"
                      IsClosable="False" />
         </StackPanel>
 
         <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,24,0,0">
-            <Button Content="Speichern"
+            <Button Content="Save"
                     Style="{StaticResource AccentButtonStyle}"
                     HorizontalAlignment="Stretch"
                     Padding="0,10"
                     Click="OnSave" />
             <Button Grid.Column="1"
-                    Content="Abbrechen"
+                    Content="Cancel"
                     HorizontalAlignment="Stretch"
                     Padding="0,10"
                     Click="OnCancel" />

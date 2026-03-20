@@ -14,14 +14,14 @@
               VerticalAlignment="Center" HorizontalAlignment="Center">
             <StackPanel Spacing="8" HorizontalAlignment="Center">
                 <TextBlock Text="&#x1F3A4;" FontSize="48" HorizontalAlignment="Center" />
-                <TextBlock Text="Bereit zur Aufnahme"
+                <TextBlock Text="Ready to Record"
                            Style="{StaticResource TitleTextBlockStyle}"
                            HorizontalAlignment="Center" />
                 <TextBlock Text="{x:Bind ViewModel.HotkeyDisplay, Mode=OneWay}"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                            HorizontalAlignment="Center"
                            Margin="0,0,0,20" />
-                <Button Content="Aufnahme starten"
+                <Button Content="Start Recording"
                         Style="{StaticResource AccentButtonStyle}"
                         Command="{x:Bind ViewModel.StartRecordingCommand}"
                         HorizontalAlignment="Center"
@@ -46,7 +46,7 @@
                     </Ellipse.Resources>
                 </Ellipse>
 
-                <TextBlock Text="Aufnahme läuft..."
+                <TextBlock Text="Recording..."
                            Style="{StaticResource TitleTextBlockStyle}"
                            HorizontalAlignment="Center" />
 
@@ -58,17 +58,17 @@
                 <InfoBar x:Name="SilenceWarning"
                          IsOpen="{x:Bind ViewModel.ShowSilenceWarning, Mode=OneWay}"
                          Severity="Warning"
-                         Title="Kein Audiosignal erkannt"
-                         Message="Bitte Mikrofon prüfen."
+                         Title="No Audio Signal Detected"
+                         Message="Please check your microphone."
                          IsClosable="False"
                          Margin="0,0,0,12" />
 
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                    <Button Content="Stoppen"
+                    <Button Content="Stop"
                             Style="{StaticResource AccentButtonStyle}"
                             Command="{x:Bind ViewModel.StopRecordingCommand}"
                             Padding="24,10" />
-                    <Button Content="Abbrechen"
+                    <Button Content="Cancel"
                             Command="{x:Bind ViewModel.CancelRecordingCommand}"
                             Padding="24,10" />
                 </StackPanel>
@@ -81,7 +81,7 @@
               VerticalAlignment="Center" HorizontalAlignment="Center">
             <StackPanel Spacing="16" HorizontalAlignment="Center">
                 <ProgressRing IsActive="True" Width="48" Height="48" />
-                <TextBlock Text="Wird transkribiert..."
+                <TextBlock Text="Transcribing..."
                            Style="{StaticResource SubtitleTextBlockStyle}"
                            HorizontalAlignment="Center" />
             </StackPanel>
@@ -94,7 +94,7 @@
 
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
                 <TextBlock Text="&#x2705;" FontSize="20" VerticalAlignment="Center" />
-                <TextBlock Text="Transkription abgeschlossen"
+                <TextBlock Text="Transcription Complete"
                            Style="{StaticResource SubtitleTextBlockStyle}"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -108,13 +108,13 @@
             </ScrollViewer>
 
             <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12">
-                <Button Content="Neue Aufnahme"
-                        Style="{StaticResource AccentButtonStyle}"
+                <Button Content="New Recording"
                         Command="{x:Bind ViewModel.NewRecordingCommand}"
                         HorizontalAlignment="Stretch"
                         Padding="0,10" />
                 <Button Grid.Column="1"
-                        Content="Text kopieren"
+                        Content="Copy Text"
+                        Style="{StaticResource AccentButtonStyle}"
                         Command="{x:Bind ViewModel.CopyTextCommand}"
                         HorizontalAlignment="Stretch"
                         Padding="0,10" />
@@ -127,7 +127,7 @@
               VerticalAlignment="Center" HorizontalAlignment="Center">
             <StackPanel Spacing="8" HorizontalAlignment="Center">
                 <TextBlock Text="&#x26A0;&#xFE0F;" FontSize="36" HorizontalAlignment="Center" />
-                <TextBlock Text="Fehler"
+                <TextBlock Text="Error"
                            Style="{StaticResource SubtitleTextBlockStyle}"
                            Foreground="Red"
                            HorizontalAlignment="Center" />
@@ -137,7 +137,7 @@
                            MaxWidth="400"
                            HorizontalAlignment="Center"
                            Margin="0,0,0,20" />
-                <Button Content="Nochmal"
+                <Button Content="Retry"
                         Style="{StaticResource AccentButtonStyle}"
                         Command="{x:Bind ViewModel.NewRecordingCommand}"
                         HorizontalAlignment="Center"

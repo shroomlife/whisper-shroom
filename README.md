@@ -1,70 +1,92 @@
-# WhisperShroom 🎤
+# 🍄 WhisperShroom
 
-Ein natives Windows 11 Tool für Voice-to-Text mit OpenAI Whisper API. Gebaut mit WinUI 3 und .NET 10.
-
-## Features
-
-- **System Tray Icon** - Läuft unauffällig im Hintergrund
-- **Globaler Hotkey** - Konfigurierbarer Hotkey (Standard: `Ctrl+Shift+E`)
-- **Echtzeit-Timer** - Zeigt die Aufnahmedauer an
-- **Silence Detection** - Warnung wenn kein Audiosignal erkannt wird
-- **Whisper API** - Nutzt OpenAIs modernste Spracherkennung
-- **Deutschsprachig** - Optimiert für deutsche Transkription
-- **Ein-Klick Kopieren** - Text direkt in die Zwischenablage
-- **Fluent Design** - Native Windows 11 UI mit Mica/Acrylic
-
-## Installation
-
-1. **Zertifikat installieren** (einmalig): Rechtsklick auf `WhisperShroom_Dev.cer` → "Zertifikat installieren" → "Lokaler Computer" → "Vertrauenswürdige Personen"
-2. **App installieren**: Doppelklick auf `WhisperShroom_x.x.x.x_x64.msix`
-3. **Update**: Einfach neue `.msix` doppelklicken - Windows updated automatisch
-
-## Benutzung
-
-1. **Starten** - App aus dem Startmenü starten
-2. **API-Key** - Beim ersten Start OpenAI API-Key eingeben
-3. **Aufnehmen** - Hotkey drücken oder Tray-Icon klicken
-4. **Stoppen** - Nochmal Hotkey oder Stop-Button
-5. **Kopieren** - "Text kopieren" Button oder Ctrl+C
-
-## Build
-
-### Voraussetzungen
-
-- Windows 10/11 (x64)
-- .NET 10 SDK
-- Windows App SDK
-
-### Build-Schritte
-
-```bash
-# Debug (unsigned)
-dotnet build src/WhisperShroom/WhisperShroom/WhisperShroom.csproj -p:Platform=x64 -p:AppxPackageSigningEnabled=false
-
-# Release MSIX
-dotnet build src/WhisperShroom/WhisperShroom/WhisperShroom.csproj -c Release -p:Platform=x64
-```
-
-Die `.msix` liegt dann in `dist/`.
-
-## Konfiguration
-
-```
-%APPDATA%\WhisperShroom\config.json
-```
-
-Kann jederzeit über das Tray-Menü → Einstellungen geändert werden.
-
-## Technologie
-
-| Bereich | Technologie |
-|---------|------------|
-| UI Framework | WinUI 3 (Windows App SDK) |
-| Sprache | C# / .NET 10 |
-| Audio | NAudio (WASAPI) |
-| API | OpenAI Whisper |
-| Deployment | MSIX (Sideload) |
+**Voice-to-Text for Windows 11 — powered by OpenAI Whisper**
 
 ---
 
-Made for Robin 🍄
+Most AI tools still don't offer voice input. WhisperShroom fills that gap. It's a lightweight system tray app that records your voice via a global hotkey, sends it to OpenAI's Whisper API, and puts the transcribed text on your clipboard — ready to paste anywhere.
+
+Whisper's German speech recognition is exceptionally accurate, making WhisperShroom the perfect companion for dictating into any app — chat windows, editors, browser forms, you name it.
+
+## ✨ Features
+
+- 🎤 **Global Hotkey** — Start/stop recording from anywhere (default: `Ctrl+Shift+E`, fully customizable)
+- 🖱️ **Tray Icon Control** — Left-click to toggle recording, right-click for the context menu
+- ⏱️ **Live Recording Timer** — See exactly how long you've been recording
+- 🔇 **Silence Detection** — Get a warning if no audio signal is detected
+- 📋 **One-Click Copy** — Transcribed text goes to your clipboard instantly
+- ✏️ **Editable Results** — Review and edit the transcription before copying
+- 🎛️ **Microphone Selection** — Pick any input device, right from the tray menu
+- 🧠 **Hallucination Filter** — Automatically rejects known Whisper artifacts (subtitle credits, etc.)
+- 🪟 **Native Windows 11 UI** — Built with WinUI 3 and Fluent Design
+- 🔒 **Runs in the Tray** — Stays out of your way, always one hotkey press away
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Windows 10** (1809+) or **Windows 11**
+- An **OpenAI API key** ([get one here](https://platform.openai.com/api-keys))
+
+### Install
+
+1. Download the latest `.msix` package from [Releases](https://github.com/shroomlife/whisper-shroom/releases)
+2. Double-click the `.msix` to install
+3. Launch **WhisperShroom** from the Start Menu
+4. Enter your OpenAI API key in the Settings dialog
+5. Done — press your hotkey or click the tray icon to start recording! 🎉
+
+> **Note:** On first install, Windows may ask you to trust the developer certificate. This is required for sideloaded apps.
+
+## 🎯 Usage
+
+| Action | What happens |
+|--------|-------------|
+| **Press hotkey** (`Ctrl+Shift+E`) | Start/stop recording |
+| **Left-click** tray icon | Start/stop recording |
+| **Double-click** tray icon | Show the main window |
+| **Right-click** tray icon | Open context menu (microphone selection, settings, quit) |
+
+### Recording Flow
+
+1. Press your hotkey or left-click the tray icon
+2. Speak — the app shows a live timer and a pulsing red dot 🔴
+3. Press the hotkey again (or click Stop) to finish
+4. Whisper transcribes your audio in seconds
+5. Click **Copy Text** to paste it anywhere ✨
+
+## 🛠️ Build from Source
+
+```bash
+# Restore dependencies
+dotnet restore src/WhisperShroom/WhisperShroom/WhisperShroom.csproj
+
+# Debug build (unsigned, for local development)
+dotnet build src/WhisperShroom/WhisperShroom/WhisperShroom.csproj -p:Platform=x64 -p:AppxPackageSigningEnabled=false
+
+# Release build (MSIX package)
+dotnet build src/WhisperShroom/WhisperShroom/WhisperShroom.csproj -c Release -p:Platform=x64
+```
+
+Requires **.NET 10 SDK** and the **Windows App SDK**.
+
+## 🏗️ Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| UI Framework | WinUI 3 (Windows App SDK 1.7) |
+| Runtime | .NET 10 (C#) |
+| MVVM | CommunityToolkit.Mvvm |
+| Audio Capture | NAudio (WASAPI) |
+| Global Hotkey | Win32 `RegisterHotKey` via CsWin32 |
+| System Tray | H.NotifyIcon.WinUI |
+| Speech-to-Text | OpenAI Whisper API |
+| Packaging | MSIX (sideloaded) |
+
+## 👨‍💻 Developed by
+
+**[shroomlife](https://github.com/shroomlife)**
+
+---
+
+<sub>Built with 🍄 and a lot of voice recordings.</sub>

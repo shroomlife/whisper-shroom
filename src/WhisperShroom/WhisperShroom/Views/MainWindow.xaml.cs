@@ -75,6 +75,12 @@ public sealed partial class MainWindow : Window
 
         UpdateTrayTooltip();
 
+        // Left-click: toggle recording (like pressing the hotkey)
+        _trayIcon.LeftClickCommand = new RelayCommand(() =>
+        {
+            DispatcherQueue.TryEnqueue(() => App.MainViewModel.ToggleRecording());
+        });
+
         // Double-click: show window
         _trayIcon.DoubleClickCommand = new RelayCommand(() =>
         {
@@ -100,7 +106,7 @@ public sealed partial class MainWindow : Window
         try
         {
             NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING,
-                MenuId_ToggleRecording, "Aufnahme starten/stoppen");
+                MenuId_ToggleRecording, "Toggle Recording");
 
             NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_SEPARATOR, 0, null);
 
@@ -117,7 +123,7 @@ public sealed partial class MainWindow : Window
 
             var defaultFlags = NativeMenu.MF_STRING;
             if (currentDevice is null) defaultFlags |= NativeMenu.MF_CHECKED;
-            NativeMenu.AppendMenuW(hMicMenu, defaultFlags, MenuId_DefaultDevice, "Standard-Gerät");
+            NativeMenu.AppendMenuW(hMicMenu, defaultFlags, MenuId_DefaultDevice, "Default Device");
 
             uint deviceId = MenuId_DeviceBase;
             foreach (var device in devices)
@@ -129,15 +135,15 @@ public sealed partial class MainWindow : Window
             }
 
             NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_POPUP,
-                (nuint)hMicMenu, "Mikrofon");
+                (nuint)hMicMenu, "Microphone");
 
             NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING,
-                MenuId_Settings, "Einstellungen");
+                MenuId_Settings, "Settings");
 
             NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_SEPARATOR, 0, null);
 
             NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING,
-                MenuId_Quit, "Beenden");
+                MenuId_Quit, "Quit");
 
             // Required so the menu dismisses when clicking outside
             NativeMenu.SetForegroundWindow(hWnd);

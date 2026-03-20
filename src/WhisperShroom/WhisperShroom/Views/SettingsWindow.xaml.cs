@@ -32,7 +32,7 @@ public sealed partial class SettingsWindow : Window
         _appWindow = AppWindow.GetFromWindowId(windowId);
 
         _appWindow.Resize(new Windows.Graphics.SizeInt32(500, 550));
-        _appWindow.Title = "WhisperShroom - Einstellungen";
+        _appWindow.Title = "WhisperShroom - Settings";
 
         if (_appWindow.Presenter is OverlappedPresenter presenter)
         {
@@ -66,7 +66,7 @@ public sealed partial class SettingsWindow : Window
     {
         _isRecordingHotkey = true;
         _hotkeyBeforeRecording = ViewModel.Hotkey;
-        HotkeyBox.Text = "Tastenkombination drücken...";
+        HotkeyBox.Text = "Press a key combination...";
 
         // Unregister global hotkey so it doesn't trigger during recording
         App.HotkeyService.Unregister();
@@ -134,7 +134,7 @@ public sealed partial class SettingsWindow : Window
     {
         if (string.IsNullOrWhiteSpace(ViewModel.ApiKey))
         {
-            ErrorInfo.Message = "API-Key wird benötigt!";
+            ErrorInfo.Message = "API key is required!";
             ErrorInfo.IsOpen = true;
             return;
         }
@@ -146,14 +146,14 @@ public sealed partial class SettingsWindow : Window
         }
         catch (ArgumentException ex)
         {
-            ErrorInfo.Message = $"Ungültige Tastenkombination: {ex.Message}";
+            ErrorInfo.Message = $"Invalid hotkey: {ex.Message}";
             ErrorInfo.IsOpen = true;
             return;
         }
 
         if (!ViewModel.Save())
         {
-            ErrorInfo.Message = "Einstellungen konnten nicht gespeichert werden.";
+            ErrorInfo.Message = "Failed to save settings.";
             ErrorInfo.IsOpen = true;
             return;
         }

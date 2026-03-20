@@ -77,7 +77,7 @@ src/WhisperShroom/WhisperShroom/
 
 ## Key Conventions
 
-- UI language is German (labels, error messages, button text).
+- UI language is English (labels, error messages, button text).
 - Transcription is hardcoded to German (`language="de"`).
 - Main window is always-on-top via `OverlappedPresenter.IsAlwaysOnTop`.
 - Window close hides to tray; "Beenden" exits the app.
@@ -89,5 +89,5 @@ src/WhisperShroom/WhisperShroom/
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.0.7.0**
+- Current version: **1.1.0.0**
 - Bump the version with every release build / bug fix round.
