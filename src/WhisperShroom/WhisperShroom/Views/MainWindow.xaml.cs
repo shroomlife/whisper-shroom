@@ -4,8 +4,8 @@ using H.NotifyIcon.Core;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Windows.Win32;
+using Windows.Win32.UI.WindowsAndMessaging;
 using WinRT.Interop;
 
 namespace WhisperShroom.Views;
@@ -14,6 +14,12 @@ public sealed partial class MainWindow : Window
 {
     private readonly AppWindow _appWindow;
     private TaskbarIcon? _trayIcon;
+
+    private const uint MenuId_ToggleRecording = 1;
+    private const uint MenuId_Settings = 2;
+    private const uint MenuId_Quit = 3;
+    private const uint MenuId_DefaultDevice = 100;
+    private const uint MenuId_DeviceBase = 101;
 
     public MainWindow()
     {
@@ -56,7 +62,11 @@ public sealed partial class MainWindow : Window
     {
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "icon.ico");
 
-        _trayIcon = new TaskbarIcon();
+        _trayIcon = new TaskbarIcon
+        {
+            // Stable GUID so Windows remembers tray icon visibility across MSIX updates
+            Id = new Guid("A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D")
+        };
 
         if (File.Exists(iconPath))
         {
@@ -72,100 +82,113 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(ShowAndActivate);
         });
 
-        // Disable automatic context menu — position it manually at cursor
+        // Disable H.NotifyIcon's built-in context menu — use native Win32 popup menu instead
+        // (H.NotifyIcon's PopupMenu mode needs a separate NuGet package, SecondWindow has sizing bugs)
         _trayIcon.MenuActivation = PopupActivationMode.None;
-        _trayIcon.RightClickCommand = new RelayCommand(() =>
-        {
-            PInvoke.GetCursorPos(out var point);
-            _trayIcon.ShowContextMenu(
-                new System.Drawing.Point(point.X, point.Y));
-        });
-
-        // Context menu via MenuFlyout
-        RebuildTrayMenu();
+        _trayIcon.RightClickCommand = new RelayCommand(ShowNativeContextMenu);
 
         _trayIcon.ForceCreate();
     }
 
-    private void RebuildTrayMenu()
+    private void ShowNativeContextMenu()
     {
-        if (_trayIcon is null) return;
+        var hWnd = new Windows.Win32.Foundation.HWND(WindowNative.GetWindowHandle(this));
+        PInvoke.GetCursorPos(out var cursorPos);
 
-        var flyout = new MenuFlyout();
+        var hMenu = PInvoke.CreatePopupMenu();
+        if (hMenu.IsNull) return;
 
-        // Start/Stop
-        flyout.Items.Add(new MenuFlyoutItem
+        try
         {
-            Text = "Aufnahme starten/stoppen",
-            Command = new RelayCommand(() => App.MainViewModel.ToggleRecording())
-        });
+            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_STRING,
+                MenuId_ToggleRecording, "Aufnahme starten/stoppen");
 
-        flyout.Items.Add(new MenuFlyoutSeparator());
+            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
 
-        // Hotkey display (disabled)
-        var hotkey = App.ConfigService.Config.Hotkey.ToUpperInvariant();
-        flyout.Items.Add(new MenuFlyoutItem { Text = $"Hotkey: {hotkey}", IsEnabled = false });
+            var hotkey = App.ConfigService.Config.Hotkey.ToUpperInvariant();
+            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_STRING | MENU_ITEM_FLAGS.MF_GRAYED,
+                0, $"Hotkey: {hotkey}");
 
-        flyout.Items.Add(new MenuFlyoutSeparator());
+            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
 
-        // Microphone submenu
-        var micSub = new MenuFlyoutSubItem { Text = "Mikrofon" };
-        var devices = App.AudioService.GetInputDevices();
-        var currentDevice = App.ConfigService.Config.DeviceName;
+            // Microphone submenu
+            var hMicMenu = PInvoke.CreatePopupMenu();
+            var devices = App.AudioService.GetInputDevices();
+            var currentDevice = App.ConfigService.Config.DeviceName;
 
-        micSub.Items.Add(new ToggleMenuFlyoutItem
-        {
-            Text = "Standard-Gerät",
-            IsChecked = currentDevice is null,
-            Command = new RelayCommand(() =>
+            var defaultFlags = MENU_ITEM_FLAGS.MF_STRING;
+            if (currentDevice is null) defaultFlags |= MENU_ITEM_FLAGS.MF_CHECKED;
+            PInvoke.AppendMenu(hMicMenu, defaultFlags, MenuId_DefaultDevice, "Standard-Gerät");
+
+            uint deviceId = MenuId_DeviceBase;
+            foreach (var device in devices)
             {
+                var flags = MENU_ITEM_FLAGS.MF_STRING;
+                if (device.Name == currentDevice) flags |= MENU_ITEM_FLAGS.MF_CHECKED;
+                PInvoke.AppendMenu(hMicMenu, flags, deviceId, device.Name);
+                deviceId++;
+            }
+
+            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_POPUP,
+                (nuint)hMicMenu.Value, "Mikrofon");
+
+            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_STRING,
+                MenuId_Settings, "Einstellungen");
+
+            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
+
+            PInvoke.AppendMenu(hMenu, MENU_ITEM_FLAGS.MF_STRING,
+                MenuId_Quit, "Beenden");
+
+            // Required so the menu dismisses when clicking outside
+            PInvoke.SetForegroundWindow(hWnd);
+
+            var tpmFlags = TRACK_POPUP_MENU_FLAGS.TPM_RETURNCMD
+                         | TRACK_POPUP_MENU_FLAGS.TPM_BOTTOMALIGN;
+            var result = PInvoke.TrackPopupMenuEx(hMenu, (uint)tpmFlags,
+                cursorPos.X, cursorPos.Y, hWnd);
+
+            if (result)
+            {
+                var selectedId = (uint)result.Value;
+                DispatcherQueue.TryEnqueue(() => HandleMenuCommand(selectedId, devices));
+            }
+        }
+        finally
+        {
+            PInvoke.DestroyMenu(hMenu);
+        }
+    }
+
+    private void HandleMenuCommand(uint commandId, IReadOnlyList<Models.AudioDevice> devices)
+    {
+        switch (commandId)
+        {
+            case MenuId_ToggleRecording:
+                App.MainViewModel.ToggleRecording();
+                break;
+            case MenuId_Settings:
+                ShowSettingsWindow();
+                break;
+            case MenuId_Quit:
+                App.MainViewModel.QuitCommand.Execute(null);
+                break;
+            case MenuId_DefaultDevice:
                 App.ConfigService.Config.DeviceName = null;
                 App.ConfigService.Save();
-                RebuildTrayMenu();
-            })
-        });
-
-        foreach (var device in devices)
-        {
-            var devName = device.Name;
-            micSub.Items.Add(new ToggleMenuFlyoutItem
-            {
-                Text = devName,
-                IsChecked = devName == currentDevice,
-                Command = new RelayCommand(() =>
+                break;
+            default:
+                if (commandId >= MenuId_DeviceBase)
                 {
-                    App.ConfigService.Config.DeviceName = devName;
-                    App.ConfigService.Save();
-                    RebuildTrayMenu();
-                })
-            });
+                    var index = (int)(commandId - MenuId_DeviceBase);
+                    if (index < devices.Count)
+                    {
+                        App.ConfigService.Config.DeviceName = devices[index].Name;
+                        App.ConfigService.Save();
+                    }
+                }
+                break;
         }
-
-        flyout.Items.Add(micSub);
-
-        // Settings
-        flyout.Items.Add(new MenuFlyoutItem
-        {
-            Text = "Einstellungen",
-            Command = new RelayCommand(() =>
-            {
-                DispatcherQueue.TryEnqueue(() => ShowSettingsWindow());
-            })
-        });
-
-        flyout.Items.Add(new MenuFlyoutSeparator());
-
-        // Quit
-        flyout.Items.Add(new MenuFlyoutItem
-        {
-            Text = "Beenden",
-            Command = new RelayCommand(() =>
-            {
-                DispatcherQueue.TryEnqueue(() => App.MainViewModel.QuitCommand.Execute(null));
-            })
-        });
-
-        _trayIcon.ContextFlyout = flyout;
     }
 
     public void Hide()
@@ -224,11 +247,7 @@ public sealed partial class MainWindow : Window
         var settingsWindow = new SettingsWindow();
         settingsWindow.Saved += () =>
         {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                UpdateTrayTooltip();
-                RebuildTrayMenu();
-            });
+            DispatcherQueue.TryEnqueue(UpdateTrayTooltip);
         };
         settingsWindow.Activate();
     }
