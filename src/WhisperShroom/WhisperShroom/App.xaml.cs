@@ -27,6 +27,21 @@ public partial class App : Application
         System.Diagnostics.Debug.WriteLine($"[App] Unhandled XAML exception: {e.Exception}");
     }
 
+    private void ShowSetupWizard()
+    {
+        var wizard = new Views.SetupWizardWindow();
+        wizard.Completed += () =>
+        {
+            MainAppWindow.DispatcherQueue.TryEnqueue(() =>
+            {
+                HotkeyService.Register(ConfigService.Config.Hotkey, MainViewModel.ToggleRecording);
+                MainAppWindow.UpdateTrayTooltip();
+                MainAppWindow.Hide();
+            });
+        };
+        wizard.Activate();
+    }
+
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         ConfigService.Load();
@@ -35,20 +50,21 @@ public partial class App : Application
 
         // Window must be created and activated once for WinUI to initialize,
         // then hidden if we want tray-only mode
+        // Window must be created and activated for WinUI + tray init.
+        // It starts off-screen (see MainWindow.ConfigureWindow) so there's no visible flash.
         MainAppWindow = new Views.MainWindow();
         MainAppWindow.Activate();
+        MainAppWindow.Hide();
 
         if (string.IsNullOrEmpty(ConfigService.Config.ApiKey))
         {
-            // First launch: show settings
-            MainAppWindow.ShowSettingsWindow();
+            // First launch: show setup wizard
+            ShowSetupWizard();
         }
         else
         {
-            // Has config: hide window, run from tray only
+            // Has config: run from tray only
             HotkeyService.Register(ConfigService.Config.Hotkey, MainViewModel.ToggleRecording);
-            // Hide window after tray icon is initialized - run from tray only
-            MainAppWindow.Hide();
         }
     }
 }

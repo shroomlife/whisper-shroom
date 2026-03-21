@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="WhisperShroom.Views.SetupWizardWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:WhisperShroom.Models"
+    Title="WhisperShroom - Setup">
+
+    <Grid Padding="32" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Spacing="4" Margin="0,0,0,24">
+            <TextBlock Text="Welcome to WhisperShroom"
+                       Style="{StaticResource TitleTextBlockStyle}" />
+            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                <Run Text="Step " /><Run Text="{x:Bind ViewModel.StepNumber, Mode=OneWay}" /><Run Text=" of 4" />
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Step 1: API Key -->
+        <StackPanel Grid.Row="1"
+                    Visibility="{x:Bind IsStep(ViewModel.CurrentStep, models:WizardStep.ApiKey), Mode=OneWay}"
+                    Spacing="16" VerticalAlignment="Center">
+            <TextBlock Text="WhisperShroom uses OpenAI's Whisper API to transcribe your voice recordings into text."
+                       TextWrapping="Wrap" />
+            <TextBlock Text="To get started, enter your OpenAI API key. You can create one at platform.openai.com under API Keys."
+                       TextWrapping="Wrap"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <PasswordBox x:Name="ApiKeyBox"
+                         Header="OpenAI API Key"
+                         PlaceholderText="sk-..."
+                         Password="{x:Bind ViewModel.ApiKey, Mode=TwoWay}" />
+        </StackPanel>
+
+        <!-- Step 2: Hotkey -->
+        <StackPanel Grid.Row="1"
+                    Visibility="{x:Bind IsStep(ViewModel.CurrentStep, models:WizardStep.Hotkey), Mode=OneWay}"
+                    Spacing="16" VerticalAlignment="Center">
+            <TextBlock Text="WhisperShroom uses a global hotkey to start and stop recording. Press the hotkey anywhere on your desktop to begin recording, and press it again to stop and transcribe."
+                       TextWrapping="Wrap" />
+            <TextBlock Text="Click the field below and press your desired key combination."
+                       TextWrapping="Wrap"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBox x:Name="HotkeyBox"
+                     Header="Global Hotkey"
+                     PlaceholderText="Click and press a key combination"
+                     Text="{x:Bind ViewModel.Hotkey, Mode=TwoWay}"
+                     IsReadOnly="True"
+                     GotFocus="HotkeyBox_GotFocus"
+                     LostFocus="HotkeyBox_LostFocus"
+                     PreviewKeyDown="HotkeyBox_PreviewKeyDown" />
+        </StackPanel>
+
+        <!-- Step 3: Audio Device -->
+        <StackPanel Grid.Row="1"
+                    Visibility="{x:Bind IsStep(ViewModel.CurrentStep, models:WizardStep.AudioDevice), Mode=OneWay}"
+                    Spacing="16" VerticalAlignment="Center">
+            <TextBlock Text="Select which microphone WhisperShroom should use for recording."
+                       TextWrapping="Wrap" />
+            <TextBlock Text="'Default Device' uses whatever Windows has set as the default recording device in Sound Settings."
+                       TextWrapping="Wrap"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <ComboBox Header="Microphone"
+                      ItemsSource="{x:Bind ViewModel.DeviceNames, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedDeviceName, Mode=TwoWay}"
+                      HorizontalAlignment="Stretch" />
+        </StackPanel>
+
+        <!-- Step 4: Features -->
+        <StackPanel Grid.Row="1"
+                    Visibility="{x:Bind IsStep(ViewModel.CurrentStep, models:WizardStep.Features), Mode=OneWay}"
+                    Spacing="24" VerticalAlignment="Center">
+            <TextBlock Text="Configure optional features. You can change these later in Settings."
+                       TextWrapping="Wrap" />
+
+            <StackPanel Spacing="4">
+                <CheckBox Content="Auto-copy to clipboard"
+                          IsChecked="{x:Bind ViewModel.AutoCopyEnabled, Mode=TwoWay}" />
+                <TextBlock Text="Automatically copies the transcribed text to your clipboard when transcription is complete."
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Margin="32,0,0,0" />
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+                <CheckBox Content="Show notifications"
+                          IsChecked="{x:Bind ViewModel.NotificationsEnabled, Mode=TwoWay}" />
+                <TextBlock Text="Shows a Windows notification when transcription is complete, even when the app is hidden in the system tray."
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Margin="32,0,0,0" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Footer: InfoBar + Navigation -->
+        <StackPanel Grid.Row="2" Spacing="12" Margin="0,24,0,0">
+            <InfoBar x:Name="ErrorInfo"
+                     IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+                     Severity="Error"
+                     Title="Error"
+                     Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                     IsClosable="False" />
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <Button Content="Back"
+                        HorizontalAlignment="Stretch"
+                        Padding="0,10"
+                        Visibility="{x:Bind BoolToVisible(ViewModel.CanGoBack), Mode=OneWay}"
+                        Click="OnBack" />
+                <Button x:Name="NextButton"
+                        Grid.Column="1"
+                        HorizontalAlignment="Stretch"
+                        Padding="0,10"
+                        Style="{StaticResource AccentButtonStyle}"
+                        IsEnabled="{x:Bind ViewModel.CanGoNext, Mode=OneWay}"
+                        Click="OnNext">
+                    <TextBlock Text="{x:Bind NextButtonText(ViewModel.IsLastStep), Mode=OneWay}" />
+                </Button>
+            </Grid>
+        </StackPanel>
+    </Grid>
+</Window>

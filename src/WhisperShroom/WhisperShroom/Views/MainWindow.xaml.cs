@@ -43,7 +43,9 @@ public sealed partial class MainWindow : Window
             presenter.IsMaximizable = false;
         }
 
-        CenterOnScreen();
+        // Start off-screen to prevent visible flash during Activate().
+        // CenterOnScreen() is called by ShowAndActivate() when the window needs to be shown.
+        _appWindow.Move(new Windows.Graphics.PointInt32(-10000, -10000));
 
         try
         {
