@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
+using WhisperShroom.Helpers;
 using WhisperShroom.Models;
 using WhisperShroom.Services;
 
@@ -135,6 +135,19 @@ public partial class MainViewModel : ObservableObject
 
             ResultText = trimmed;
             CurrentState = AppState.Result;
+
+            var config = App.ConfigService.Config;
+
+            if (config.AutoCopyEnabled)
+            {
+                var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainAppWindow);
+                ClipboardHelper.CopyToClipboard(trimmed, hWnd);
+            }
+
+            if (config.NotificationsEnabled)
+            {
+                App.NotificationService.ShowTranscriptionResult(trimmed);
+            }
         }
         catch (Exception ex)
         {
@@ -162,56 +175,11 @@ public partial class MainViewModel : ObservableObject
         CurrentState = AppState.Ready;
     }
 
-    private const uint CF_UNICODETEXT = 13;
-    private const uint GMEM_MOVEABLE = 0x0002;
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool OpenClipboard(nint hWndNewOwner);
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool CloseClipboard();
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool EmptyClipboard();
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    private static partial nint SetClipboardData(uint uFormat, nint hMem);
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    private static partial nint GlobalAlloc(uint uFlags, nuint dwBytes);
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    private static partial nint GlobalLock(nint hMem);
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GlobalUnlock(nint hMem);
-
     [RelayCommand]
     private void CopyText()
     {
         var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainAppWindow);
-        if (!OpenClipboard(hWnd))
-            return;
-
-        try
-        {
-            EmptyClipboard();
-
-            var bytes = System.Text.Encoding.Unicode.GetBytes(ResultText + "\0");
-            var hGlobal = GlobalAlloc(GMEM_MOVEABLE, (nuint)bytes.Length);
-            var ptr = GlobalLock(hGlobal);
-            Marshal.Copy(bytes, 0, ptr, bytes.Length);
-            GlobalUnlock(hGlobal);
-            SetClipboardData(CF_UNICODETEXT, hGlobal);
-        }
-        finally
-        {
-            CloseClipboard();
-        }
+        ClipboardHelper.CopyToClipboard(ResultText, hWnd);
     }
 
     [RelayCommand]
@@ -226,6 +194,7 @@ public partial class MainViewModel : ObservableObject
         App.HotkeyService.Dispose();
         App.AudioService.Dispose();
         App.TranscriptionService.Dispose();
+        App.NotificationService.Dispose();
         App.MainAppWindow.ForceClose();
     }
 

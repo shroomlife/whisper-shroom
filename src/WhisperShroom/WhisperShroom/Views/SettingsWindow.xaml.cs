@@ -31,7 +31,7 @@ public sealed partial class SettingsWindow : Window
         var windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
         _appWindow = AppWindow.GetFromWindowId(windowId);
 
-        _appWindow.Resize(new Windows.Graphics.SizeInt32(500, 550));
+        _appWindow.Resize(new Windows.Graphics.SizeInt32(500, 620));
         _appWindow.Title = "WhisperShroom - Settings";
 
         if (_appWindow.Presenter is OverlappedPresenter presenter)
@@ -58,7 +58,7 @@ public sealed partial class SettingsWindow : Window
         var workArea = displayArea.WorkArea;
 
         var x = (workArea.Width - 500) / 2 + workArea.X;
-        var y = (workArea.Height - 550) / 2 + workArea.Y;
+        var y = (workArea.Height - 620) / 2 + workArea.Y;
         _appWindow.Move(new Windows.Graphics.PointInt32(x, y));
     }
 

@@ -17,6 +17,12 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial List<string> DeviceNames { get; set; }
 
+    [ObservableProperty]
+    public partial bool AutoCopyEnabled { get; set; }
+
+    [ObservableProperty]
+    public partial bool NotificationsEnabled { get; set; }
+
     public SettingsViewModel()
     {
         var config = App.ConfigService.Config;
@@ -30,6 +36,9 @@ public partial class SettingsViewModel : ObservableObject
         SelectedDeviceName = config.DeviceName is not null && DeviceNames.Contains(config.DeviceName)
             ? config.DeviceName
             : "Default Device";
+
+        AutoCopyEnabled = config.AutoCopyEnabled;
+        NotificationsEnabled = config.NotificationsEnabled;
     }
 
     public bool Save()
@@ -52,6 +61,8 @@ public partial class SettingsViewModel : ObservableObject
         config.ApiKey = ApiKey.Trim();
         config.Hotkey = hk;
         config.DeviceName = SelectedDeviceName == "Default Device" ? null : SelectedDeviceName;
+        config.AutoCopyEnabled = AutoCopyEnabled;
+        config.NotificationsEnabled = NotificationsEnabled;
 
         App.ConfigService.Save();
 

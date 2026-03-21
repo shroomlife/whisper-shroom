@@ -40,6 +40,12 @@
                      LostFocus="HotkeyBox_LostFocus"
                      PreviewKeyDown="HotkeyBox_PreviewKeyDown" />
 
+            <CheckBox Content="Auto-copy to clipboard after transcription"
+                      IsChecked="{x:Bind ViewModel.AutoCopyEnabled, Mode=TwoWay}" />
+
+            <CheckBox Content="Show notification when transcription is complete"
+                      IsChecked="{x:Bind ViewModel.NotificationsEnabled, Mode=TwoWay}" />
+
             <InfoBar x:Name="ErrorInfo"
                      IsOpen="False"
                      Severity="Error"

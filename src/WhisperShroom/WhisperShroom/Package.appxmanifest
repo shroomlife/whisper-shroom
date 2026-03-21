@@ -3,11 +3,13 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap com desktop">
 
   <Identity Name="WhisperShroom"
             Publisher="CN=WhisperShroom Dev"
-            Version="1.1.0.0"
+            Version="1.2.1.0"
             ProcessorArchitecture="x64" />
 
   <Properties>
@@ -39,6 +41,19 @@
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"
                          Square71x71Logo="Assets\Square71x71Logo.png" />
       </uap:VisualElements>
+
+      <Extensions>
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="B4E5F2A1-7C3D-4E8F-9A1B-6D2C8E4F0A3B" />
+        </desktop:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="WhisperShroom.exe" DisplayName="WhisperShroom Notification Activator" Arguments="----AppNotificationActivated:">
+              <com:Class Id="B4E5F2A1-7C3D-4E8F-9A1B-6D2C8E4F0A3B" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

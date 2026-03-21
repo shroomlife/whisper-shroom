@@ -12,4 +12,10 @@ public sealed class AppConfig
 
     [JsonPropertyName("device_name")]
     public string? DeviceName { get; set; }
+
+    [JsonPropertyName("auto_copy")]
+    public bool AutoCopyEnabled { get; set; } = true;
+
+    [JsonPropertyName("notifications")]
+    public bool NotificationsEnabled { get; set; } = true;
 }

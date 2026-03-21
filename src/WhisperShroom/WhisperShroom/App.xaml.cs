@@ -10,6 +10,7 @@ public partial class App : Application
     public static AudioService AudioService { get; } = new();
     public static TranscriptionService TranscriptionService { get; } = new();
     public static HotkeyService HotkeyService { get; } = new();
+    public static NotificationService NotificationService { get; } = new();
 
     public static MainViewModel MainViewModel { get; private set; } = null!;
     public static Views.MainWindow MainAppWindow { get; private set; } = null!;
@@ -17,11 +18,19 @@ public partial class App : Application
     public App()
     {
         this.InitializeComponent();
+        this.UnhandledException += OnUnhandledException;
+    }
+
+    private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        e.Handled = true;
+        System.Diagnostics.Debug.WriteLine($"[App] Unhandled XAML exception: {e.Exception}");
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         ConfigService.Load();
+        NotificationService.Register();
         MainViewModel = new MainViewModel();
 
         // Window must be created and activated once for WinUI to initialize,
