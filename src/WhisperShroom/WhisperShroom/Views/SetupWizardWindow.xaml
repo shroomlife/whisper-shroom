@@ -35,6 +35,21 @@
                          Header="OpenAI API Key"
                          PlaceholderText="sk-..."
                          Password="{x:Bind ViewModel.ApiKey, Mode=TwoWay}" />
+
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="Test Connection"
+                        Click="OnTestConnection"
+                        IsEnabled="{x:Bind Not(ViewModel.IsTesting), Mode=OneWay}" />
+                <ProgressRing IsActive="{x:Bind ViewModel.IsTesting, Mode=OneWay}"
+                              Visibility="{x:Bind BoolToVisible(ViewModel.IsTesting), Mode=OneWay}"
+                              Width="24" Height="24" />
+            </StackPanel>
+
+            <InfoBar IsOpen="{x:Bind ViewModel.HasTestResult, Mode=OneWay}"
+                     Severity="{x:Bind TestSeverity(ViewModel.TestSucceeded), Mode=OneWay}"
+                     Title="{x:Bind TestTitle(ViewModel.TestSucceeded), Mode=OneWay}"
+                     Message="{x:Bind ViewModel.TestResultMessage, Mode=OneWay}"
+                     IsClosable="False" />
         </StackPanel>
 
         <!-- Step 2: Hotkey -->

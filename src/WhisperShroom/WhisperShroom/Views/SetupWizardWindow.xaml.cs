@@ -2,6 +2,7 @@ using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
 using WinRT.Interop;
@@ -130,6 +131,13 @@ public sealed partial class SetupWizardWindow : Window
         NextButton.Focus(FocusState.Programmatic);
     }
 
+    // --- API key test ---
+
+    private void OnTestConnection(object sender, RoutedEventArgs e)
+    {
+        ViewModel.TestConnectionCommand.Execute(null);
+    }
+
     // --- Navigation ---
 
     private void OnNext(object sender, RoutedEventArgs e)
@@ -158,4 +166,12 @@ public sealed partial class SetupWizardWindow : Window
 
     public string NextButtonText(bool isLastStep) =>
         isLastStep ? "Finish" : "Next";
+
+    public bool Not(bool value) => !value;
+
+    public InfoBarSeverity TestSeverity(bool succeeded) =>
+        succeeded ? InfoBarSeverity.Success : InfoBarSeverity.Error;
+
+    public string TestTitle(bool succeeded) =>
+        succeeded ? "Success" : "Failed";
 }

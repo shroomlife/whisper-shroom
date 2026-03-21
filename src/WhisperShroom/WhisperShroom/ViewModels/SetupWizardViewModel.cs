@@ -33,6 +33,18 @@ public partial class SetupWizardViewModel : ObservableObject
     [ObservableProperty]
     public partial bool HasError { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsTesting { get; set; }
+
+    [ObservableProperty]
+    public partial string TestResultMessage { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasTestResult { get; set; }
+
+    [ObservableProperty]
+    public partial bool TestSucceeded { get; set; }
+
     public bool CanGoNext => CurrentStep != WizardStep.ApiKey || !string.IsNullOrWhiteSpace(ApiKey);
     public bool CanGoBack => CurrentStep > WizardStep.ApiKey;
     public bool IsLastStep => CurrentStep == WizardStep.Features;
@@ -47,6 +59,7 @@ public partial class SetupWizardViewModel : ObservableObject
         AutoCopyEnabled = true;
         NotificationsEnabled = true;
         ErrorMessage = "";
+        TestResultMessage = "";
 
         var devices = App.AudioService.GetInputDevices();
         DeviceNames = ["Default Device", .. devices.Select(d => d.Name)];
@@ -56,6 +69,7 @@ public partial class SetupWizardViewModel : ObservableObject
     partial void OnCurrentStepChanged(WizardStep value)
     {
         HasError = false;
+        HasTestResult = false;
         OnPropertyChanged(nameof(CanGoNext));
         OnPropertyChanged(nameof(CanGoBack));
         OnPropertyChanged(nameof(IsLastStep));
@@ -64,7 +78,49 @@ public partial class SetupWizardViewModel : ObservableObject
 
     partial void OnApiKeyChanged(string value)
     {
+        HasTestResult = false;
         OnPropertyChanged(nameof(CanGoNext));
+    }
+
+    [RelayCommand]
+    private async Task TestConnectionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ApiKey))
+        {
+            ErrorMessage = "Enter an API key first.";
+            HasError = true;
+            return;
+        }
+
+        HasError = false;
+        HasTestResult = false;
+        IsTesting = true;
+
+        try
+        {
+            var error = await App.TranscriptionService.ValidateApiKeyAsync(ApiKey.Trim());
+            if (error is null)
+            {
+                TestSucceeded = true;
+                TestResultMessage = "Connection successful — Whisper API is available.";
+            }
+            else
+            {
+                TestSucceeded = false;
+                TestResultMessage = error;
+            }
+            HasTestResult = true;
+        }
+        catch (Exception ex)
+        {
+            TestSucceeded = false;
+            TestResultMessage = $"Connection failed: {ex.Message}";
+            HasTestResult = true;
+        }
+        finally
+        {
+            IsTesting = false;
+        }
     }
 
     [RelayCommand]
