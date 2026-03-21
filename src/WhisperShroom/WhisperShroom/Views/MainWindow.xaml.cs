@@ -234,9 +234,17 @@ public sealed partial class MainWindow : Window
 
     public void ShowAndActivate()
     {
-        _appWindow.Show();
-        this.Activate();
+        // Center first so the window appears at the right position
         CenterOnScreen();
+        _appWindow.Show();
+
+        // Re-assert always-on-top after showing from hidden state
+        if (_appWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.IsAlwaysOnTop = true;
+        }
+
+        this.Activate();
     }
 
     public void ForceClose()

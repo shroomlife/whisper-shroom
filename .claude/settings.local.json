@@ -6,7 +6,8 @@
       "mcp__microsoft-learn__microsoft_docs_fetch",
       "mcp__plugin_context7_context7__resolve-library-id",
       "Bash(dotnet build:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:platform.openai.com)"
     ]
   }
 }

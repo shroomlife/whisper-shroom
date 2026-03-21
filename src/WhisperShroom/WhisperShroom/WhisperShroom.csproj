@@ -8,11 +8,14 @@
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
-    <AppxPackageSigningEnabled>true</AppxPackageSigningEnabled>
-    <PackageCertificateKeyFile>WhisperShroom_Dev.pfx</PackageCertificateKeyFile>
+    <!-- Package mode: override with -p:UapAppxPackageBuildMode=StoreUpload for Store submission -->
+    <UapAppxPackageBuildMode>SideloadOnly</UapAppxPackageBuildMode>
+    <!-- Signing: self-signed for sideload, Microsoft signs Store packages -->
+    <AppxPackageSigningEnabled Condition="'$(UapAppxPackageBuildMode)' != 'StoreUpload'">true</AppxPackageSigningEnabled>
+    <AppxPackageSigningEnabled Condition="'$(UapAppxPackageBuildMode)' == 'StoreUpload'">false</AppxPackageSigningEnabled>
+    <PackageCertificateKeyFile Condition="'$(AppxPackageSigningEnabled)' == 'true'">WhisperShroom_Dev.pfx</PackageCertificateKeyFile>
     <GenerateAppxPackageOnBuild Condition="'$(Configuration)'=='Release'">true</GenerateAppxPackageOnBuild>
     <AppxPackageDir>$(MSBuildThisFileDirectory)..\..\..\dist\</AppxPackageDir>
-    <UapAppxPackageBuildMode>SideloadOnly</UapAppxPackageBuildMode>
     <AppxBundle>Never</AppxBundle>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
