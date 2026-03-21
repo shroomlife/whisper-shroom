@@ -83,7 +83,21 @@
             <ComboBox Header="Microphone"
                       ItemsSource="{x:Bind ViewModel.DeviceNames, Mode=OneWay}"
                       SelectedItem="{x:Bind ViewModel.SelectedDeviceName, Mode=TwoWay}"
-                      HorizontalAlignment="Stretch" />
+                      HorizontalAlignment="Stretch"
+                      SelectionChanged="DeviceCombo_SelectionChanged" />
+
+            <StackPanel Spacing="8" Margin="0,8,0,0">
+                <TextBlock Text="Microphone Level"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           FontSize="12" />
+                <ProgressBar x:Name="LevelMeter"
+                             Minimum="0" Maximum="100" Value="0"
+                             Height="8"
+                             CornerRadius="4" />
+                <TextBlock Text="Speak to test your microphone."
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           FontSize="12" />
+            </StackPanel>
         </StackPanel>
 
         <!-- Step 4: Features -->

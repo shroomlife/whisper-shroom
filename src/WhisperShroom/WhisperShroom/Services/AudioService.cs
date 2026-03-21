@@ -7,6 +7,7 @@ namespace WhisperShroom.Services;
 public sealed class AudioService : IDisposable
 {
     private WasapiCapture? _capture;
+    private WasapiCapture? _monitor;
     private MemoryStream? _wavStream;
     private WaveFileWriter? _wavWriter;
     private bool _hasAudio;
@@ -15,6 +16,7 @@ public sealed class AudioService : IDisposable
 
     public bool IsRecording { get; private set; }
     public event Action<float>? RmsUpdated;
+    public event Action<float>? LevelUpdated;
 
     public IReadOnlyList<AudioDevice> GetInputDevices()
     {
@@ -144,8 +146,59 @@ public sealed class AudioService : IDisposable
         _wavStream = null;
     }
 
+    // --- Level monitoring (no WAV writing, for live level meter) ---
+
+    public void StartMonitoring(string? deviceId)
+    {
+        StopMonitoring();
+
+        MMDevice? device = null;
+        if (deviceId is not null)
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            try { device = enumerator.GetDevice(deviceId); }
+            catch { device = null; }
+        }
+
+        _monitor = device is not null
+            ? new WasapiCapture(device) { WaveFormat = new WaveFormat(TargetSampleRate, 16, 1) }
+            : new WasapiCapture() { WaveFormat = new WaveFormat(TargetSampleRate, 16, 1) };
+
+        _monitor.DataAvailable += OnMonitorDataAvailable;
+        _monitor.StartRecording();
+    }
+
+    public void StopMonitoring()
+    {
+        if (_monitor is not null)
+        {
+            _monitor.DataAvailable -= OnMonitorDataAvailable;
+            try { _monitor.StopRecording(); } catch { }
+            _monitor.Dispose();
+            _monitor = null;
+        }
+    }
+
+    private void OnMonitorDataAvailable(object? sender, WaveInEventArgs e)
+    {
+        if (e.BytesRecorded <= 0) return;
+
+        double sum = 0;
+        int sampleCount = e.BytesRecorded / 2;
+        for (int i = 0; i < e.BytesRecorded; i += 2)
+        {
+            short sample = BitConverter.ToInt16(e.Buffer, i);
+            float normalized = sample / 32768f;
+            sum += normalized * normalized;
+        }
+
+        float rms = (float)Math.Sqrt(sum / sampleCount);
+        LevelUpdated?.Invoke(rms);
+    }
+
     public void Dispose()
     {
+        StopMonitoring();
         CancelRecording();
         Cleanup();
     }

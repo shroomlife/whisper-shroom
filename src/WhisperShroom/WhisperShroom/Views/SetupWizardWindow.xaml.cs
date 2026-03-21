@@ -56,6 +56,8 @@ public sealed partial class SetupWizardWindow : Window
         CenterOnScreen();
 
         ViewModel.Completed += OnWizardCompleted;
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _appWindow.Closing += OnClosing;
     }
 
     private void CenterOnScreen()
@@ -131,6 +133,52 @@ public sealed partial class SetupWizardWindow : Window
         NextButton.Focus(FocusState.Programmatic);
     }
 
+    // --- Audio level monitoring ---
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SetupWizardViewModel.CurrentStep))
+        {
+            if (ViewModel.CurrentStep == WizardStep.AudioDevice)
+                StartLevelMonitoring();
+            else
+                StopLevelMonitoring();
+        }
+    }
+
+    private void DeviceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ViewModel.CurrentStep == WizardStep.AudioDevice)
+            StartLevelMonitoring();
+    }
+
+    private void StartLevelMonitoring()
+    {
+        App.AudioService.LevelUpdated -= OnLevelUpdated;
+        var devices = App.AudioService.GetInputDevices();
+        var match = devices.FirstOrDefault(d => d.Name == ViewModel.SelectedDeviceName);
+        App.AudioService.StartMonitoring(match?.Id);
+        App.AudioService.LevelUpdated += OnLevelUpdated;
+    }
+
+    private void StopLevelMonitoring()
+    {
+        App.AudioService.LevelUpdated -= OnLevelUpdated;
+        App.AudioService.StopMonitoring();
+        DispatcherQueue.TryEnqueue(() => LevelMeter.Value = 0);
+    }
+
+    private void OnLevelUpdated(float rms)
+    {
+        var level = Math.Min(100, rms * 500);
+        DispatcherQueue.TryEnqueue(() => LevelMeter.Value = level);
+    }
+
+    private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        StopLevelMonitoring();
+    }
+
     // --- API key test ---
 
     private void OnTestConnection(object sender, RoutedEventArgs e)
@@ -152,6 +200,7 @@ public sealed partial class SetupWizardWindow : Window
 
     private void OnWizardCompleted()
     {
+        StopLevelMonitoring();
         Completed?.Invoke();
         this.Close();
     }
