@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using WhisperShroom.Helpers;
 using WhisperShroom.Models;
 
 namespace WhisperShroom.ViewModels;
@@ -16,6 +17,11 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     public partial List<string> DeviceNames { get; set; }
+
+    [ObservableProperty]
+    public partial string SelectedLanguage { get; set; }
+
+    public List<string> AvailableLanguages => LanguageHelper.AvailableLanguages;
 
     [ObservableProperty]
     public partial bool AutoCopyEnabled { get; set; }
@@ -36,6 +42,8 @@ public partial class SettingsViewModel : ObservableObject
         SelectedDeviceName = config.DeviceName is not null && DeviceNames.Contains(config.DeviceName)
             ? config.DeviceName
             : "Default Device";
+
+        SelectedLanguage = LanguageHelper.ToDisplayName(config.Language);
 
         AutoCopyEnabled = config.AutoCopyEnabled;
         NotificationsEnabled = config.NotificationsEnabled;
@@ -61,6 +69,7 @@ public partial class SettingsViewModel : ObservableObject
         config.ApiKey = ApiKey.Trim();
         config.Hotkey = hk;
         config.DeviceName = SelectedDeviceName == "Default Device" ? null : SelectedDeviceName;
+        config.Language = LanguageHelper.ToCode(SelectedLanguage);
         config.AutoCopyEnabled = AutoCopyEnabled;
         config.NotificationsEnabled = NotificationsEnabled;
 

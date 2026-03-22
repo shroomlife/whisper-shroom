@@ -121,8 +121,9 @@ public partial class MainViewModel : ObservableObject
                 return;
             }
 
+            var language = App.ConfigService.Config.Language;
             var text = await Task.Run(() =>
-                App.TranscriptionService.TranscribeAsync(wavData, apiKey));
+                App.TranscriptionService.TranscribeAsync(wavData, apiKey, language));
 
             var trimmed = text.Trim();
 

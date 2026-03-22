@@ -86,6 +86,15 @@
                       HorizontalAlignment="Stretch"
                       SelectionChanged="DeviceCombo_SelectionChanged" />
 
+            <ComboBox Header="Transcription Language"
+                      ItemsSource="{x:Bind ViewModel.AvailableLanguages, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedLanguage, Mode=TwoWay}"
+                      HorizontalAlignment="Stretch" />
+            <TextBlock Text="'Auto-detect' lets Whisper identify the spoken language automatically. Selecting a specific language improves speed and accuracy."
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       FontSize="12" />
+
             <StackPanel Spacing="8" Margin="0,8,0,0">
                 <TextBlock Text="Microphone Level"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"

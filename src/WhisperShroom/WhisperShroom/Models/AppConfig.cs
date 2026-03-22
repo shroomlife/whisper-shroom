@@ -18,4 +18,7 @@ public sealed class AppConfig
 
     [JsonPropertyName("notifications")]
     public bool NotificationsEnabled { get; set; } = true;
+
+    [JsonPropertyName("language")]
+    public string? Language { get; set; } = "de";
 }

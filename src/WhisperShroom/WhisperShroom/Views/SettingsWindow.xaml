@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="WhisperShroom - Settings">
 
-    <Grid Padding="32" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid x:Name="RootGrid" Padding="32" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -16,42 +16,49 @@
                    Style="{StaticResource TitleTextBlockStyle}"
                    Margin="0,0,0,8" />
 
-        <StackPanel Grid.Row="1" Spacing="16">
-            <TextBlock Text="Voice-to-Text powered by OpenAI Whisper"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Voice-to-Text powered by OpenAI Whisper"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
-            <PasswordBox x:Name="ApiKeyBox"
-                         Header="OpenAI API Key"
-                         PlaceholderText="sk-..."
-                         Password="{x:Bind ViewModel.ApiKey, Mode=TwoWay}" />
+                <PasswordBox x:Name="ApiKeyBox"
+                             Header="OpenAI API Key"
+                             PlaceholderText="sk-..."
+                             Password="{x:Bind ViewModel.ApiKey, Mode=TwoWay}" />
 
-            <ComboBox x:Name="DeviceCombo"
-                      Header="Microphone"
-                      ItemsSource="{x:Bind ViewModel.DeviceNames, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.SelectedDeviceName, Mode=TwoWay}"
-                      HorizontalAlignment="Stretch" />
+                <ComboBox x:Name="DeviceCombo"
+                          Header="Microphone"
+                          ItemsSource="{x:Bind ViewModel.DeviceNames, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.SelectedDeviceName, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch" />
 
-            <TextBox x:Name="HotkeyBox"
-                     Header="Hotkey"
-                     PlaceholderText="Click and press a key combination"
-                     Text="{x:Bind ViewModel.Hotkey, Mode=TwoWay}"
-                     IsReadOnly="True"
-                     GotFocus="HotkeyBox_GotFocus"
-                     LostFocus="HotkeyBox_LostFocus"
-                     PreviewKeyDown="HotkeyBox_PreviewKeyDown" />
+                <ComboBox Header="Transcription Language"
+                          ItemsSource="{x:Bind ViewModel.AvailableLanguages, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.SelectedLanguage, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch" />
 
-            <CheckBox Content="Auto-copy to clipboard after transcription"
-                      IsChecked="{x:Bind ViewModel.AutoCopyEnabled, Mode=TwoWay}" />
+                <TextBox x:Name="HotkeyBox"
+                         Header="Hotkey"
+                         PlaceholderText="Click and press a key combination"
+                         Text="{x:Bind ViewModel.Hotkey, Mode=TwoWay}"
+                         IsReadOnly="True"
+                         GotFocus="HotkeyBox_GotFocus"
+                         LostFocus="HotkeyBox_LostFocus"
+                         PreviewKeyDown="HotkeyBox_PreviewKeyDown" />
 
-            <CheckBox Content="Show notification when transcription is complete"
-                      IsChecked="{x:Bind ViewModel.NotificationsEnabled, Mode=TwoWay}" />
+                <CheckBox Content="Auto-copy to clipboard after transcription"
+                          IsChecked="{x:Bind ViewModel.AutoCopyEnabled, Mode=TwoWay}" />
 
-            <InfoBar x:Name="ErrorInfo"
-                     IsOpen="False"
-                     Severity="Error"
-                     Title="Error"
-                     IsClosable="False" />
-        </StackPanel>
+                <CheckBox Content="Show notification when transcription is complete"
+                          IsChecked="{x:Bind ViewModel.NotificationsEnabled, Mode=TwoWay}" />
+
+                <InfoBar x:Name="ErrorInfo"
+                         IsOpen="False"
+                         Severity="Error"
+                         Title="Error"
+                         IsClosable="False" />
+            </StackPanel>
+        </ScrollViewer>
 
         <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,24,0,0">
             <Button Content="Save"

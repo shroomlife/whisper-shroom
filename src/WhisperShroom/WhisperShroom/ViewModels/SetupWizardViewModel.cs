@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using WhisperShroom.Helpers;
 using WhisperShroom.Models;
 
 namespace WhisperShroom.ViewModels;
@@ -20,6 +21,11 @@ public partial class SetupWizardViewModel : ObservableObject
 
     [ObservableProperty]
     public partial List<string> DeviceNames { get; set; }
+
+    [ObservableProperty]
+    public partial string SelectedLanguage { get; set; }
+
+    public List<string> AvailableLanguages => LanguageHelper.AvailableLanguages;
 
     [ObservableProperty]
     public partial bool AutoCopyEnabled { get; set; }
@@ -64,6 +70,7 @@ public partial class SetupWizardViewModel : ObservableObject
         var devices = App.AudioService.GetInputDevices();
         DeviceNames = ["Default Device", .. devices.Select(d => d.Name)];
         SelectedDeviceName = "Default Device";
+        SelectedLanguage = LanguageHelper.ToDisplayName("de");
     }
 
     partial void OnCurrentStepChanged(WizardStep value)
@@ -176,6 +183,7 @@ public partial class SetupWizardViewModel : ObservableObject
         config.ApiKey = ApiKey.Trim();
         config.Hotkey = string.IsNullOrWhiteSpace(Hotkey) ? "ctrl+shift+e" : Hotkey.Trim().ToLowerInvariant();
         config.DeviceName = SelectedDeviceName == "Default Device" ? null : SelectedDeviceName;
+        config.Language = LanguageHelper.ToCode(SelectedLanguage);
         config.AutoCopyEnabled = AutoCopyEnabled;
         config.NotificationsEnabled = NotificationsEnabled;
 

@@ -47,7 +47,7 @@ public sealed class TranscriptionService : IDisposable
         return "API key is valid but does not have access to the Whisper model.";
     }
 
-    public async Task<string> TranscribeAsync(byte[] wavData, string apiKey, CancellationToken ct = default)
+    public async Task<string> TranscribeAsync(byte[] wavData, string apiKey, string? language = null, CancellationToken ct = default)
     {
         using var content = new MultipartFormDataContent();
 
@@ -55,7 +55,9 @@ public sealed class TranscriptionService : IDisposable
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
         content.Add(fileContent, "file", "recording.wav");
         content.Add(new StringContent("whisper-1"), "model");
-        content.Add(new StringContent("de"), "language");
+
+        if (language is not null)
+            content.Add(new StringContent(language), "language");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/audio/transcriptions");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);

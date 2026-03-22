@@ -16,6 +16,8 @@ public sealed partial class SettingsWindow : Window
     private bool _isRecordingHotkey;
     private string _hotkeyBeforeRecording = "";
 
+    private const int WindowWidth = 500;
+
     public SettingsViewModel ViewModel { get; } = new();
 
     /// <summary>
@@ -31,7 +33,8 @@ public sealed partial class SettingsWindow : Window
         var windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
         _appWindow = AppWindow.GetFromWindowId(windowId);
 
-        _appWindow.Resize(new Windows.Graphics.SizeInt32(500, 620));
+        // Start with a tall window; will auto-shrink to content after layout
+        _appWindow.Resize(new Windows.Graphics.SizeInt32(WindowWidth, 900));
         _appWindow.Title = "WhisperShroom - Settings";
 
         if (_appWindow.Presenter is OverlappedPresenter presenter)
@@ -48,6 +51,31 @@ public sealed partial class SettingsWindow : Window
         }
         catch { }
 
+        // Move off-screen initially, then auto-size + center after layout
+        _appWindow.Move(new Windows.Graphics.PointInt32(-10000, -10000));
+        RootGrid.Loaded += OnContentLoaded;
+    }
+
+    private void OnContentLoaded(object sender, RoutedEventArgs e)
+    {
+        RootGrid.Loaded -= OnContentLoaded;
+
+        var scale = Content.XamlRoot.RasterizationScale;
+
+        // Chrome (title bar) height in physical pixels
+        var chromeHeight = _appWindow.Size.Height - (int)(RootGrid.ActualHeight * scale);
+
+        // Measure content at current rendered width to get ideal height (DIPs → physical pixels)
+        RootGrid.Measure(new Windows.Foundation.Size(RootGrid.ActualWidth, double.PositiveInfinity));
+        var desiredHeight = (int)Math.Ceiling(RootGrid.DesiredSize.Height * scale) + chromeHeight;
+
+        // Cap at 90% of work area
+        var displayArea = DisplayArea.GetFromWindowId(
+            _appWindow.Id, DisplayAreaFallback.Primary);
+        var maxHeight = (int)(displayArea.WorkArea.Height * 0.9);
+        var finalHeight = Math.Min(desiredHeight, maxHeight);
+
+        _appWindow.Resize(new Windows.Graphics.SizeInt32(WindowWidth, finalHeight));
         CenterOnScreen();
     }
 
@@ -57,8 +85,8 @@ public sealed partial class SettingsWindow : Window
             _appWindow.Id, DisplayAreaFallback.Primary);
         var workArea = displayArea.WorkArea;
 
-        var x = (workArea.Width - 500) / 2 + workArea.X;
-        var y = (workArea.Height - 620) / 2 + workArea.Y;
+        var x = (workArea.Width - _appWindow.Size.Width) / 2 + workArea.X;
+        var y = (workArea.Height - _appWindow.Size.Height) / 2 + workArea.Y;
         _appWindow.Move(new Windows.Graphics.PointInt32(x, y));
     }
 
