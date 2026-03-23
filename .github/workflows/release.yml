@@ -34,23 +34,42 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/v}"
           echo "tag_version=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Restore signing certificate
-        shell: bash
+      - name: Import signing certificate
+        shell: pwsh
         run: |
-          echo "${{ secrets.SIGNING_CERTIFICATE_BASE64 }}" | base64 --decode > src/WhisperShroom/WhisperShroom/WhisperShroom_Dev.pfx
+          $pfxBytes = [Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE_BASE64 }}")
+          $pfxPath = "src/WhisperShroom/WhisperShroom/WhisperShroom_Dev.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+
+          $password = "${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}"
+          if ($password) {
+            $securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
+            Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+          } else {
+            Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My
+          }
 
       - name: Restore NuGet packages
         run: dotnet restore ${{ env.PROJECT_PATH }}
 
       - name: Build signed MSIX
-        run: >
-          dotnet build ${{ env.PROJECT_PATH }}
-          -c Release
-          -p:Platform=${{ env.PLATFORM }}
-          -p:UapAppxPackageBuildMode=SideloadOnly
-          -p:AppxPackageSigningEnabled=true
-          -p:PackageCertificateKeyFile=WhisperShroom_Dev.pfx
-          -p:PackageCertificatePassword=${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          $password = "${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}"
+          $args = @(
+            "build"
+            "${{ env.PROJECT_PATH }}"
+            "-c", "Release"
+            "-p:Platform=${{ env.PLATFORM }}"
+            "-p:UapAppxPackageBuildMode=SideloadOnly"
+            "-p:AppxPackageSigningEnabled=true"
+            "-p:PackageCertificateKeyFile=WhisperShroom_Dev.pfx"
+          )
+          if ($password) {
+            $args += "-p:PackageCertificatePassword=$password"
+          }
+          & dotnet @args
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Find MSIX artifact
         id: artifact
@@ -122,9 +141,19 @@ jobs:
         id: artifact
         shell: bash
         run: |
-          UPLOAD=$(find dist/ -name "*.msixupload" -type f | head -1)
+          echo "Searching for .msixupload files..."
+          find dist/ -name "*.msixupload" -type f 2>/dev/null
+          find . -path "*/AppPackages/*.msixupload" -type f 2>/dev/null
+          UPLOAD=$(find dist/ -name "*.msixupload" -type f 2>/dev/null | head -1)
           if [ -z "$UPLOAD" ]; then
-            echo "::error::No .msixupload file found in dist/"
+            UPLOAD=$(find . -path "*/AppPackages/*.msixupload" -type f 2>/dev/null | head -1)
+          fi
+          if [ -z "$UPLOAD" ]; then
+            echo "::error::No .msixupload file found"
+            echo "Contents of dist/:"
+            find dist/ -type f 2>/dev/null || echo "dist/ does not exist"
+            echo "Contents of bin/:"
+            find src/ -path "*/AppPackages/*" -type f 2>/dev/null || echo "No AppPackages found"
             exit 1
           fi
           echo "upload_path=$UPLOAD" >> "$GITHUB_OUTPUT"
