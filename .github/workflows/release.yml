@@ -135,14 +135,23 @@ jobs:
           body: |
             ## Installation
 
-            ### Microsoft Store (empfohlen)
-            Suche nach **WhisperShroom** im Microsoft Store oder besuche die [Store-Seite](https://apps.microsoft.com/).
+            ### Microsoft Store (recommended)
+            Search for **WhisperShroom** in the Microsoft Store or visit the [Store page](https://apps.microsoft.com/detail/9MX4RZGVCZMJ).
 
-            ### Sideload (manuell)
-            1. Lade `WhisperShroom_*.msix` herunter
-            2. Falls nötig: Installiere zuerst das Zertifikat (`.cer`-Datei) unter **Vertrauenswürdige Personen** im Zertifikatspeicher
-            3. Doppelklick auf die `.msix`-Datei zum Installieren
+            ### Sideload (manual)
 
-            > **Hinweis:** Bei selbst-signiertem Zertifikat muss das Zertifikat einmalig manuell installiert werden. Eine Anleitung findest du im [README](https://github.com/${{ github.repository }}#installation).
+            **Step 1: Install the certificate (one-time setup)**
+
+            Download the `.cer` file and run this command in an **Admin PowerShell**:
+
+            ```powershell
+            Import-Certificate -FilePath "$HOME\Downloads\WhisperShroom_${{ steps.version.outputs.tag_version }}.0_x64.cer" -CertStoreLocation "Cert:\LocalMachine\TrustedPeople"
+            ```
+
+            **Step 2: Install the app**
+
+            Download the `.msix` file and double-click to install.
+
+            > **Note:** The certificate only needs to be installed once. Future updates can be installed by just downloading the new `.msix`.
           files: |
             artifacts/*
