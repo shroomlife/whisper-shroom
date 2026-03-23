@@ -13,7 +13,8 @@
     <!-- Signing: self-signed for sideload, Microsoft signs Store packages -->
     <AppxPackageSigningEnabled Condition="'$(UapAppxPackageBuildMode)' != 'StoreUpload'">true</AppxPackageSigningEnabled>
     <AppxPackageSigningEnabled Condition="'$(UapAppxPackageBuildMode)' == 'StoreUpload'">false</AppxPackageSigningEnabled>
-    <PackageCertificateKeyFile Condition="'$(AppxPackageSigningEnabled)' == 'true'">WhisperShroom_Dev.pfx</PackageCertificateKeyFile>
+    <PackageCertificateThumbprint Condition="'$(AppxPackageSigningEnabled)' == 'true' AND '$(PackageCertificateKeyFile)' == ''">4501F2CDFC5B6EFBD5D6D418E4D9AA52CD2C367F</PackageCertificateThumbprint>
+    <PackageCertificateKeyFile Condition="'$(AppxPackageSigningEnabled)' == 'true' AND '$(PackageCertificateKeyFile)' != ''">$(PackageCertificateKeyFile)</PackageCertificateKeyFile>
     <GenerateAppxPackageOnBuild Condition="'$(Configuration)'=='Release'">true</GenerateAppxPackageOnBuild>
     <AppxPackageDir>$(MSBuildThisFileDirectory)..\..\..\dist\</AppxPackageDir>
     <AppxBundle>Never</AppxBundle>
