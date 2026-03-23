@@ -141,19 +141,13 @@ jobs:
         id: artifact
         shell: bash
         run: |
-          echo "Searching for .msixupload files..."
-          find dist/ -name "*.msixupload" -type f 2>/dev/null
-          find . -path "*/AppPackages/*.msixupload" -type f 2>/dev/null
-          UPLOAD=$(find dist/ -name "*.msixupload" -type f 2>/dev/null | head -1)
+          echo "=== Searching all .msixupload files ==="
+          find . -name "*.msixupload" -type f 2>/dev/null
+          echo "=== Searching all .msix files in dist/ ==="
+          find dist/ -type f 2>/dev/null
+          UPLOAD=$(find . -name "*.msixupload" -type f 2>/dev/null | head -1)
           if [ -z "$UPLOAD" ]; then
-            UPLOAD=$(find . -path "*/AppPackages/*.msixupload" -type f 2>/dev/null | head -1)
-          fi
-          if [ -z "$UPLOAD" ]; then
-            echo "::error::No .msixupload file found"
-            echo "Contents of dist/:"
-            find dist/ -type f 2>/dev/null || echo "dist/ does not exist"
-            echo "Contents of bin/:"
-            find src/ -path "*/AppPackages/*" -type f 2>/dev/null || echo "No AppPackages found"
+            echo "::error::No .msixupload file found anywhere"
             exit 1
           fi
           echo "upload_path=$UPLOAD" >> "$GITHUB_OUTPUT"
@@ -167,7 +161,8 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-sideload, build-store]
+    needs: [build-sideload]
+    if: always() && needs.build-sideload.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
@@ -195,6 +190,7 @@ jobs:
         with:
           name: msixupload-store
           path: artifacts/
+        continue-on-error: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
