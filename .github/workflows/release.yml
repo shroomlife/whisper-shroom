@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build-sideload:
-    name: Build MSIX (Sideload)
+  build:
+    name: Build MSIX
     runs-on: windows-latest
 
     env:
@@ -108,61 +108,9 @@ jobs:
           name: msix-certificate
           path: ${{ steps.cert.outputs.cer_path }}
 
-  build-store:
-    name: Build MSIXUPLOAD (Store)
-    runs-on: windows-latest
-
-    env:
-      PROJECT_PATH: src/WhisperShroom/WhisperShroom/WhisperShroom.csproj
-      PLATFORM: x64
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-          dotnet-quality: "preview"
-
-      - name: Restore NuGet packages
-        run: dotnet restore ${{ env.PROJECT_PATH }}
-
-      - name: Build unsigned MSIXUPLOAD for Store
-        run: >
-          dotnet build ${{ env.PROJECT_PATH }}
-          -c Release
-          -p:Platform=${{ env.PLATFORM }}
-          -p:UapAppxPackageBuildMode=StoreUpload
-          -p:AppxPackageSigningEnabled=false
-
-      - name: Find MSIXUPLOAD artifact
-        id: artifact
-        shell: bash
-        run: |
-          echo "=== Searching all .msixupload files ==="
-          find . -name "*.msixupload" -type f 2>/dev/null
-          echo "=== Searching all .msix files in dist/ ==="
-          find dist/ -type f 2>/dev/null
-          UPLOAD=$(find . -name "*.msixupload" -type f 2>/dev/null | head -1)
-          if [ -z "$UPLOAD" ]; then
-            echo "::error::No .msixupload file found anywhere"
-            exit 1
-          fi
-          echo "upload_path=$UPLOAD" >> "$GITHUB_OUTPUT"
-          echo "upload_name=$(basename $UPLOAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Upload Store artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: msixupload-store
-          path: ${{ steps.artifact.outputs.upload_path }}
-
   release:
     name: Create GitHub Release
-    needs: [build-sideload]
-    if: always() && needs.build-sideload.result == 'success'
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -185,13 +133,6 @@ jobs:
           path: artifacts/
         continue-on-error: true
 
-      - name: Download Store MSIXUPLOAD
-        uses: actions/download-artifact@v4
-        with:
-          name: msixupload-store
-          path: artifacts/
-        continue-on-error: true
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -201,7 +142,7 @@ jobs:
             ## Installation
 
             ### Microsoft Store (empfohlen)
-            Die Store-Version wird separat im [Microsoft Partner Center](https://partner.microsoft.com/) eingereicht.
+            Suche nach **WhisperShroom** im Microsoft Store oder besuche die [Store-Seite](https://apps.microsoft.com/).
 
             ### Sideload (manuell)
             1. Lade `WhisperShroom_*.msix` herunter
