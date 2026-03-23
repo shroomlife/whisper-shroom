@@ -35,6 +35,7 @@ jobs:
           echo "tag_version=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Import signing certificate
+        id: cert_import
         shell: pwsh
         run: |
           $pfxBytes = [Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE_BASE64 }}")
@@ -44,32 +45,25 @@ jobs:
           $password = "${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}"
           if ($password) {
             $securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
-            Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+            $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
           } else {
-            Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My
+            $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My
           }
+
+          echo "thumbprint=$($cert.Thumbprint)" >> $env:GITHUB_OUTPUT
+          Write-Host "Certificate imported with thumbprint: $($cert.Thumbprint)"
 
       - name: Restore NuGet packages
         run: dotnet restore ${{ env.PROJECT_PATH }}
 
       - name: Build signed MSIX
-        shell: pwsh
-        run: |
-          $password = "${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}"
-          $args = @(
-            "build"
-            "${{ env.PROJECT_PATH }}"
-            "-c", "Release"
-            "-p:Platform=${{ env.PLATFORM }}"
-            "-p:UapAppxPackageBuildMode=SideloadOnly"
-            "-p:AppxPackageSigningEnabled=true"
-            "-p:PackageCertificateKeyFile=WhisperShroom_Dev.pfx"
-          )
-          if ($password) {
-            $args += "-p:PackageCertificatePassword=$password"
-          }
-          & dotnet @args
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: >
+          dotnet build ${{ env.PROJECT_PATH }}
+          -c Release
+          -p:Platform=${{ env.PLATFORM }}
+          -p:UapAppxPackageBuildMode=SideloadOnly
+          -p:AppxPackageSigningEnabled=true
+          -p:PackageCertificateThumbprint=${{ steps.cert_import.outputs.thumbprint }}
 
       - name: Find MSIX artifact
         id: artifact
