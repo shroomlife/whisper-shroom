@@ -137,11 +137,16 @@
                            MaxWidth="400"
                            HorizontalAlignment="Center"
                            Margin="0,0,0,20" />
-                <Button Content="Retry"
-                        Style="{StaticResource AccentButtonStyle}"
-                        Command="{x:Bind ViewModel.NewRecordingCommand}"
-                        HorizontalAlignment="Center"
-                        Padding="24,10" />
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                    <Button Content="Open Settings"
+                            Command="{x:Bind ViewModel.OpenSettingsCommand}"
+                            Visibility="{x:Bind ViewModel.ShowSettingsOnError, Mode=OneWay}"
+                            Padding="24,10" />
+                    <Button Content="Retry"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Command="{x:Bind ViewModel.NewRecordingCommand}"
+                            Padding="24,10" />
+                </StackPanel>
             </StackPanel>
         </Grid>
 

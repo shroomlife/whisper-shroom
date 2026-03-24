@@ -30,6 +30,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial bool ShowSilenceWarning { get; set; }
 
+    [ObservableProperty]
+    public partial bool ShowSettingsOnError { get; set; }
+
     public string HotkeyDisplay => App.ConfigService.Config.Hotkey.ToUpperInvariant();
 
     public MainViewModel()
@@ -59,9 +62,19 @@ public partial class MainViewModel : ObservableObject
     {
         if (CurrentState == AppState.Recording) return;
 
+        var config = App.ConfigService.Config;
+
+        if (string.IsNullOrWhiteSpace(config.ApiKey))
+        {
+            ShowSettingsOnError = true;
+            ErrorMessage = "No API key configured. Please add your OpenAI API key in Settings.";
+            CurrentState = AppState.Error;
+            App.MainAppWindow.ShowAndActivate();
+            return;
+        }
+
         try
         {
-            var config = App.ConfigService.Config;
             string? deviceId = null;
 
             if (config.DeviceName is not null)
@@ -114,9 +127,10 @@ public partial class MainViewModel : ObservableObject
         try
         {
             var apiKey = App.ConfigService.Config.ApiKey;
-            if (string.IsNullOrEmpty(apiKey))
+            if (string.IsNullOrWhiteSpace(apiKey))
             {
-                ErrorMessage = "API key not configured.";
+                ShowSettingsOnError = true;
+                ErrorMessage = "No API key configured. Please add your OpenAI API key in Settings.";
                 CurrentState = AppState.Error;
                 return;
             }
@@ -152,6 +166,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            ShowSettingsOnError = ex.Message.Contains("API key", StringComparison.OrdinalIgnoreCase);
             ErrorMessage = ex.Message;
             CurrentState = AppState.Error;
         }
@@ -173,6 +188,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void NewRecording()
     {
+        ShowSettingsOnError = false;
         CurrentState = AppState.Ready;
     }
 

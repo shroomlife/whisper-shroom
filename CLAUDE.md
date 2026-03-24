@@ -89,5 +89,5 @@ src/WhisperShroom/WhisperShroom/
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.2.1.0**
+- Current version: **1.5.1.0**
 - Bump the version with every release build / bug fix round.

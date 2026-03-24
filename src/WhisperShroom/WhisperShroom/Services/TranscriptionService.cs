@@ -64,7 +64,22 @@ public sealed class TranscriptionService : IDisposable
         request.Content = content;
 
         var response = await _http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var statusCode = (int)response.StatusCode;
+            throw response.StatusCode switch
+            {
+                System.Net.HttpStatusCode.Unauthorized =>
+                    new HttpRequestException("Invalid API key. Please check your key in Settings."),
+                System.Net.HttpStatusCode.TooManyRequests =>
+                    new HttpRequestException("OpenAI rate limit reached. Please wait a moment and try again."),
+                _ when statusCode >= 500 =>
+                    new HttpRequestException("OpenAI service is temporarily unavailable. Please try again later."),
+                _ =>
+                    new HttpRequestException($"Transcription failed (HTTP {statusCode}). Please try again.")
+            };
+        }
 
         var json = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(json);
