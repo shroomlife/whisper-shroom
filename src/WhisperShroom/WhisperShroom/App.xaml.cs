@@ -15,6 +15,8 @@ public partial class App : Application
     public static MainViewModel MainViewModel { get; private set; } = null!;
     public static Views.MainWindow MainAppWindow { get; private set; } = null!;
 
+    private static Views.SetupWizardWindow? _activeWizard;
+
     public App()
     {
         this.InitializeComponent();
@@ -27,11 +29,19 @@ public partial class App : Application
         System.Diagnostics.Debug.WriteLine($"[App] Unhandled XAML exception: {e.Exception}");
     }
 
-    private void ShowSetupWizard()
+    public static void ShowSetupWizard()
     {
+        if (_activeWizard is not null)
+        {
+            _activeWizard.Activate();
+            return;
+        }
+
         var wizard = new Views.SetupWizardWindow();
+        _activeWizard = wizard;
         wizard.Completed += () =>
         {
+            _activeWizard = null;
             MainAppWindow.DispatcherQueue.TryEnqueue(() =>
             {
                 HotkeyService.Register(ConfigService.Config.Hotkey, MainViewModel.ToggleRecording);
@@ -39,6 +49,7 @@ public partial class App : Application
                 MainAppWindow.Hide();
             });
         };
+        wizard.Closed += (_, _) => _activeWizard = null;
         wizard.Activate();
     }
 

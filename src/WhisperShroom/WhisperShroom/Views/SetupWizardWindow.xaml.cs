@@ -17,6 +17,8 @@ public sealed partial class SetupWizardWindow : Window
     private readonly AppWindow _appWindow;
     private bool _isRecordingHotkey;
     private string _hotkeyBeforeRecording = "";
+    private bool _wizardCompleted;
+    private bool _isClosing;
 
     private const int WindowWidth = 550;
     private const int WindowHeight = 680;
@@ -174,9 +176,35 @@ public sealed partial class SetupWizardWindow : Window
         DispatcherQueue.TryEnqueue(() => LevelMeter.Value = level);
     }
 
-    private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        StopLevelMonitoring();
+        if (_wizardCompleted || _isClosing)
+        {
+            StopLevelMonitoring();
+            return;
+        }
+
+        // Cancel the close and show confirmation dialog
+        args.Cancel = true;
+
+        var dialog = new ContentDialog
+        {
+            Title = "Quit WhisperShroom?",
+            Content = "Setup is not complete. WhisperShroom requires an API key to function and will quit if you close this wizard.",
+            PrimaryButtonText = "Quit",
+            SecondaryButtonText = "Continue Setup",
+            DefaultButton = ContentDialogButton.Secondary,
+            XamlRoot = this.Content.XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+
+        if (result == ContentDialogResult.Primary)
+        {
+            StopLevelMonitoring();
+            _isClosing = true;
+            App.MainViewModel.QuitCommand.Execute(null);
+        }
     }
 
     // --- API key test ---
@@ -201,6 +229,7 @@ public sealed partial class SetupWizardWindow : Window
     private void OnWizardCompleted()
     {
         StopLevelMonitoring();
+        _wizardCompleted = true;
         Completed?.Invoke();
         this.Close();
     }

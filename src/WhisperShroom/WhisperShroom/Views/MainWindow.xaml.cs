@@ -77,10 +77,16 @@ public sealed partial class MainWindow : Window
 
         UpdateTrayTooltip();
 
-        // Left-click: toggle recording (like pressing the hotkey)
+        // Left-click: toggle recording (like pressing the hotkey), or open wizard if no API key
         _trayIcon.LeftClickCommand = new RelayCommand(() =>
         {
-            DispatcherQueue.TryEnqueue(() => App.MainViewModel.ToggleRecording());
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (string.IsNullOrWhiteSpace(App.ConfigService.Config.ApiKey))
+                    App.ShowSetupWizard();
+                else
+                    App.MainViewModel.ToggleRecording();
+            });
         });
 
         // Double-click: show window
@@ -170,7 +176,10 @@ public sealed partial class MainWindow : Window
         switch (commandId)
         {
             case MenuId_ToggleRecording:
-                App.MainViewModel.ToggleRecording();
+                if (string.IsNullOrWhiteSpace(App.ConfigService.Config.ApiKey))
+                    App.ShowSetupWizard();
+                else
+                    App.MainViewModel.ToggleRecording();
                 break;
             case MenuId_Settings:
                 ShowSettingsWindow();
