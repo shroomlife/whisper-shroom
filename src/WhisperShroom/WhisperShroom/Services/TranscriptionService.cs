@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using WhisperShroom.Helpers;
 
 namespace WhisperShroom.Services;
 
@@ -8,7 +9,7 @@ public sealed class TranscriptionService : IDisposable
     private readonly HttpClient _http = new();
 
     /// <summary>
-    /// Validates the API key by calling GET /v1/models and checking for whisper-1.
+    /// Validates the API key by calling GET /v1/models and checking for any known transcription model.
     /// Returns null on success, or an error message on failure.
     /// </summary>
     public async Task<string?> ValidateApiKeyAsync(string apiKey, CancellationToken ct = default)
@@ -39,22 +40,59 @@ public sealed class TranscriptionService : IDisposable
         {
             foreach (var model in data.EnumerateArray())
             {
-                if (model.TryGetProperty("id", out var id) && id.GetString() == "whisper-1")
+                if (model.TryGetProperty("id", out var id) &&
+                    TranscriptionModelHelper.KnownTranscriptionModels.Contains(id.GetString() ?? ""))
                     return null; // success
             }
         }
 
-        return "API key is valid but does not have access to the Whisper model.";
+        return "API key is valid but does not have access to any supported transcription model.";
     }
 
-    public async Task<string> TranscribeAsync(byte[] wavData, string apiKey, string? language = null, CancellationToken ct = default)
+    /// <summary>
+    /// Fetches available transcription models for the given API key.
+    /// Returns only models that are known and accessible, in canonical display order.
+    /// </summary>
+    public async Task<List<string>> GetAvailableTranscriptionModelsAsync(string apiKey, CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.openai.com/v1/models");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        var response = await _http.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(json);
+
+        var found = new HashSet<string>();
+
+        if (doc.RootElement.TryGetProperty("data", out var data))
+        {
+            foreach (var model in data.EnumerateArray())
+            {
+                if (model.TryGetProperty("id", out var id))
+                {
+                    var modelId = id.GetString() ?? "";
+                    if (TranscriptionModelHelper.KnownTranscriptionModels.Contains(modelId))
+                        found.Add(modelId);
+                }
+            }
+        }
+
+        // Return in canonical display order
+        return TranscriptionModelHelper.GetOrderedModelIds()
+            .Where(found.Contains)
+            .ToList();
+    }
+
+    public async Task<string> TranscribeAsync(byte[] wavData, string apiKey, string? language = null, string? model = null, CancellationToken ct = default)
     {
         using var content = new MultipartFormDataContent();
 
         var fileContent = new ByteArrayContent(wavData);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
         content.Add(fileContent, "file", "recording.wav");
-        content.Add(new StringContent("whisper-1"), "model");
+        content.Add(new StringContent(model ?? TranscriptionModelHelper.DefaultModelId), "model");
 
         if (language is not null)
             content.Add(new StringContent(language), "language");

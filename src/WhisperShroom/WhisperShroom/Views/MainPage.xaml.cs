@@ -28,4 +28,7 @@ public sealed partial class MainPage : Page
 
     public Visibility IsState(AppState current, AppState target) =>
         current == target ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility BoolToVisible(bool value) =>
+        value ? Visibility.Visible : Visibility.Collapsed;
 }

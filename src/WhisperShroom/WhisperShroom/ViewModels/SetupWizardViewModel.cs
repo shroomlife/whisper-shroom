@@ -28,6 +28,12 @@ public partial class SetupWizardViewModel : ObservableObject
     public List<string> AvailableLanguages => LanguageHelper.AvailableLanguages;
 
     [ObservableProperty]
+    public partial string SelectedModel { get; set; }
+
+    [ObservableProperty]
+    public partial List<string> AvailableModels { get; set; }
+
+    [ObservableProperty]
     public partial bool AutoCopyEnabled { get; set; }
 
     [ObservableProperty]
@@ -67,6 +73,10 @@ public partial class SetupWizardViewModel : ObservableObject
         ErrorMessage = "";
         TestResultMessage = "";
 
+        // Model defaults
+        AvailableModels = TranscriptionModelHelper.AllDisplayNames();
+        SelectedModel = TranscriptionModelHelper.ToDisplayName(TranscriptionModelHelper.DefaultModelId);
+
         var devices = App.AudioService.GetInputDevices();
         DeviceNames = ["Default Device", .. devices.Select(d => d.Name)];
         SelectedDeviceName = "Default Device";
@@ -105,11 +115,27 @@ public partial class SetupWizardViewModel : ObservableObject
 
         try
         {
-            var error = await App.TranscriptionService.ValidateApiKeyAsync(ApiKey.Trim());
+            var trimmedKey = ApiKey.Trim();
+            var error = await App.TranscriptionService.ValidateApiKeyAsync(trimmedKey);
             if (error is null)
             {
                 TestSucceeded = true;
-                TestResultMessage = "Connection successful — Whisper API is available.";
+                TestResultMessage = "Connection successful — transcription API is available.";
+
+                // Fetch available models (separate call — runs only once during setup)
+                try
+                {
+                    var modelIds = await App.TranscriptionService.GetAvailableTranscriptionModelsAsync(trimmedKey);
+                    if (modelIds.Count > 0)
+                    {
+                        AvailableModels = modelIds.Select(TranscriptionModelHelper.ToDisplayName).ToList();
+                        SelectedModel = AvailableModels[0];
+                    }
+                }
+                catch
+                {
+                    // Keep fallback list
+                }
             }
             else
             {
@@ -184,6 +210,7 @@ public partial class SetupWizardViewModel : ObservableObject
         config.Hotkey = string.IsNullOrWhiteSpace(Hotkey) ? "ctrl+shift+e" : Hotkey.Trim().ToLowerInvariant();
         config.DeviceName = SelectedDeviceName == "Default Device" ? null : SelectedDeviceName;
         config.Language = LanguageHelper.ToCode(SelectedLanguage);
+        config.Model = TranscriptionModelHelper.ToModelId(SelectedModel);
         config.AutoCopyEnabled = AutoCopyEnabled;
         config.NotificationsEnabled = NotificationsEnabled;
 

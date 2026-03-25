@@ -54,6 +54,9 @@ public sealed partial class SettingsWindow : Window
         // Move off-screen initially, then auto-size + center after layout
         _appWindow.Move(new Windows.Graphics.PointInt32(-10000, -10000));
         RootGrid.Loaded += OnContentLoaded;
+
+        // Load available models in the background
+        _ = ViewModel.LoadModelsAsync();
     }
 
     private void OnContentLoaded(object sender, RoutedEventArgs e)
@@ -188,6 +191,20 @@ public sealed partial class SettingsWindow : Window
 
         Saved?.Invoke();
         this.Close();
+    }
+
+    private void OnEditPrefix(object sender, RoutedEventArgs e)
+    {
+        var editor = new TextEditorWindow("Edit Prefix", ViewModel.Prefix);
+        editor.Saved += text => ViewModel.UpdatePrefix(text);
+        editor.Activate();
+    }
+
+    private void OnEditSuffix(object sender, RoutedEventArgs e)
+    {
+        var editor = new TextEditorWindow("Edit Suffix", ViewModel.Suffix);
+        editor.Saved += text => ViewModel.UpdateSuffix(text);
+        editor.Activate();
     }
 
     private void OnCancel(object sender, RoutedEventArgs e)

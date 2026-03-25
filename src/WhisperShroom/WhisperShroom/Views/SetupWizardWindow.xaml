@@ -26,7 +26,7 @@
         <StackPanel Grid.Row="1"
                     Visibility="{x:Bind IsStep(ViewModel.CurrentStep, models:WizardStep.ApiKey), Mode=OneWay}"
                     Spacing="16" VerticalAlignment="Center">
-            <TextBlock Text="WhisperShroom uses OpenAI's Whisper API to transcribe your voice recordings into text."
+            <TextBlock Text="WhisperShroom uses OpenAI's transcription API to convert your voice recordings into text."
                        TextWrapping="Wrap" />
             <TextBlock Text="To get started, enter your OpenAI API key. You can create one at platform.openai.com under API Keys."
                        TextWrapping="Wrap"
@@ -50,6 +50,12 @@
                      Title="{x:Bind TestTitle(ViewModel.TestSucceeded), Mode=OneWay}"
                      Message="{x:Bind ViewModel.TestResultMessage, Mode=OneWay}"
                      IsClosable="False" />
+
+            <ComboBox Header="Transcription Model"
+                      ItemsSource="{x:Bind ViewModel.AvailableModels, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedModel, Mode=TwoWay}"
+                      HorizontalAlignment="Stretch"
+                      Visibility="{x:Bind BoolToVisible(ViewModel.TestSucceeded), Mode=OneWay}" />
         </StackPanel>
 
         <!-- Step 2: Hotkey -->

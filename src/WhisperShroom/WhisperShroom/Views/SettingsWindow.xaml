@@ -18,7 +18,7 @@
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="16">
-                <TextBlock Text="Voice-to-Text powered by OpenAI Whisper"
+                <TextBlock Text="Voice-to-Text powered by OpenAI"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
                 <PasswordBox x:Name="ApiKeyBox"
@@ -37,6 +37,17 @@
                           SelectedItem="{x:Bind ViewModel.SelectedLanguage, Mode=TwoWay}"
                           HorizontalAlignment="Stretch" />
 
+                <Grid>
+                    <ComboBox Header="Transcription Model"
+                              ItemsSource="{x:Bind ViewModel.AvailableModels, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedModel, Mode=TwoWay}"
+                              HorizontalAlignment="Stretch" />
+                    <ProgressRing IsActive="{x:Bind ViewModel.IsLoadingModels, Mode=OneWay}"
+                                  Width="20" Height="20"
+                                  HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                  Margin="0,0,48,8" />
+                </Grid>
+
                 <TextBox x:Name="HotkeyBox"
                          Header="Hotkey"
                          PlaceholderText="Click and press a key combination"
@@ -51,6 +62,32 @@
 
                 <CheckBox Content="Show notification when transcription is complete"
                           IsChecked="{x:Bind ViewModel.NotificationsEnabled, Mode=TwoWay}" />
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Transcription Text Wrapping"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               FontSize="12" />
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                        <Button Content="Edit Prefix"
+                                Click="OnEditPrefix"
+                                MinWidth="100" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{x:Bind ViewModel.PrefixPreview, Mode=OneWay}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+
+                        <Button Grid.Row="1"
+                                Content="Edit Suffix"
+                                Click="OnEditSuffix"
+                                MinWidth="100" />
+                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                   Text="{x:Bind ViewModel.SuffixPreview, Mode=OneWay}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </StackPanel>
 
                 <InfoBar x:Name="ErrorInfo"
                          IsOpen="False"

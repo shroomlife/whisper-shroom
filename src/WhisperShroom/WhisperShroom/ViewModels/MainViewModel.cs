@@ -33,6 +33,18 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial bool ShowSettingsOnError { get; set; }
 
+    [ObservableProperty]
+    public partial bool HasPrefix { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasSuffix { get; set; }
+
+    [ObservableProperty]
+    public partial bool IncludePrefix { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool IncludeSuffix { get; set; } = true;
+
     public string HotkeyDisplay => App.ConfigService.Config.Hotkey.ToUpperInvariant();
 
     public MainViewModel()
@@ -135,9 +147,11 @@ public partial class MainViewModel : ObservableObject
                 return;
             }
 
-            var language = App.ConfigService.Config.Language;
+            var config = App.ConfigService.Config;
+            var language = config.Language;
+            var model = config.Model ?? TranscriptionModelHelper.DefaultModelId;
             var text = await Task.Run(() =>
-                App.TranscriptionService.TranscribeAsync(wavData, apiKey, language));
+                App.TranscriptionService.TranscribeAsync(wavData, apiKey, language, model));
 
             var trimmed = text.Trim();
 
@@ -149,14 +163,16 @@ public partial class MainViewModel : ObservableObject
             }
 
             ResultText = trimmed;
+            HasPrefix = !string.IsNullOrEmpty(config.PromptPrefix);
+            HasSuffix = !string.IsNullOrEmpty(config.PromptSuffix);
+            IncludePrefix = true;
+            IncludeSuffix = true;
             CurrentState = AppState.Result;
-
-            var config = App.ConfigService.Config;
 
             if (config.AutoCopyEnabled)
             {
                 var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainAppWindow);
-                ClipboardHelper.CopyToClipboard(trimmed, hWnd);
+                ClipboardHelper.CopyToClipboard(AssembleCopyText(), hWnd);
             }
 
             if (config.NotificationsEnabled)
@@ -196,7 +212,23 @@ public partial class MainViewModel : ObservableObject
     private void CopyText()
     {
         var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainAppWindow);
-        ClipboardHelper.CopyToClipboard(ResultText, hWnd);
+        ClipboardHelper.CopyToClipboard(AssembleCopyText(), hWnd);
+    }
+
+    private string AssembleCopyText()
+    {
+        var config = App.ConfigService.Config;
+        var parts = new List<string>();
+
+        if (IncludePrefix && !string.IsNullOrEmpty(config.PromptPrefix))
+            parts.Add(config.PromptPrefix);
+
+        parts.Add(ResultText);
+
+        if (IncludeSuffix && !string.IsNullOrEmpty(config.PromptSuffix))
+            parts.Add(config.PromptSuffix);
+
+        return string.Join(" ", parts);
     }
 
     [RelayCommand]

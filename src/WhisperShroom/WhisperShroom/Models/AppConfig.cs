@@ -21,4 +21,13 @@ public sealed class AppConfig
 
     [JsonPropertyName("language")]
     public string? Language { get; set; } = "de";
+
+    [JsonPropertyName("model")]
+    public string? Model { get; set; } = "whisper-1";
+
+    [JsonPropertyName("prompt_prefix")]
+    public string? PromptPrefix { get; set; }
+
+    [JsonPropertyName("prompt_suffix")]
+    public string? PromptSuffix { get; set; }
 }
