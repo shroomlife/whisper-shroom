@@ -14,7 +14,11 @@ public sealed class TranscriptionEntry
     public int? AudioTokens { get; set; }
     public int? OutputTokens { get; set; }
     public int? DurationSeconds { get; set; }
+    public string Status { get; set; } = "completed";
+    public string? AudioPath { get; set; }
+    public string? ErrorMessage { get; set; }
 
+    public bool IsPending => Status == "pending";
     public string TimeDisplay => Timestamp.LocalDateTime.ToString("HH:mm");
 
     public string UsageDisplay => UsageType switch

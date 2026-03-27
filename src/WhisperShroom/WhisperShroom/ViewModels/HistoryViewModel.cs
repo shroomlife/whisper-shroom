@@ -1,5 +1,8 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using WhisperShroom.Helpers;
+using WhisperShroom.Models;
+using WhisperShroom.Services;
 
 namespace WhisperShroom.ViewModels;
 
@@ -39,6 +42,50 @@ public partial class HistoryViewModel : ObservableObject
         }
 
         IsEmpty = MonthGroups.Count == 0;
+    }
+
+    public async Task<bool> RetryEntryAsync(TranscriptionEntry entry)
+    {
+        if (entry.AudioPath is null || !File.Exists(entry.AudioPath))
+            return false;
+
+        var config = App.ConfigService.Config;
+        var apiKey = config.ApiKey;
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return false;
+
+        var model = entry.Model;
+        if (string.IsNullOrEmpty(model))
+            model = config.Model ?? TranscriptionModelHelper.DefaultModelId;
+
+        var language = entry.Language ?? config.Language;
+
+        try
+        {
+            var wavData = await File.ReadAllBytesAsync(entry.AudioPath);
+            var result = await Task.Run(() =>
+                App.TranscriptionService.TranscribeAsync(wavData, apiKey, language, model));
+
+            var trimmed = result.Text.Trim();
+
+            if (HallucinationFilter.IsHallucination(trimmed))
+                return false;
+
+            var completedResult = result with { Text = trimmed };
+            App.HistoryService.CompletePendingEntry(entry.Id, completedResult);
+
+            // Delete audio file after successful transcription
+            try { File.Delete(entry.AudioPath); } catch { }
+
+            LoadHistory();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.HistoryService.UpdatePendingError(entry.Id, ex.Message);
+            LoadHistory();
+            return false;
+        }
     }
 
     public void DeleteEntry(string id)

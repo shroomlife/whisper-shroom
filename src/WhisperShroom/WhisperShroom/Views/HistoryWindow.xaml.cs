@@ -107,7 +107,7 @@ public sealed partial class HistoryWindow : Window
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                IsExpanded = monthGroup.IsCurrentMonth,
+                IsExpanded = false,
                 Margin = new Thickness(0, 0, 0, 8),
                 // Prevents Expander from capturing DirectManipulation, letting the
                 // parent ScrollViewer handle scroll input at the compositor level.
@@ -141,7 +141,7 @@ public sealed partial class HistoryWindow : Window
                 {
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                    IsExpanded = dayGroup.Date == DateTime.Today,
+                    IsExpanded = false,
                     Margin = new Thickness(0, 0, 0, 2),
                     Padding = new Thickness(0),
                     ManipulationMode = ManipulationModes.System
@@ -226,6 +226,9 @@ public sealed partial class HistoryWindow : Window
 
     private UIElement CreateEntryCard(TranscriptionEntry entry)
     {
+        if (entry.IsPending)
+            return CreatePendingCard(entry);
+
         var border = new Border
         {
             Padding = new Thickness(12),
@@ -348,6 +351,149 @@ public sealed partial class HistoryWindow : Window
 
         border.Child = card;
         return border;
+    }
+
+    private UIElement CreatePendingCard(TranscriptionEntry entry)
+    {
+        var border = new Border
+        {
+            Padding = new Thickness(12),
+            CornerRadius = new CornerRadius(6),
+            Background = (Brush)Application.Current.Resources["SystemFillColorCautionBackgroundBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"],
+            BorderThickness = new Thickness(1),
+            ManipulationMode = ManipulationModes.System
+        };
+
+        var card = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) },
+                new ColumnDefinition { Width = GridLength.Auto }
+            },
+            RowDefinitions =
+            {
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto }
+            }
+        };
+
+        // "Not yet transcribed" label
+        var statusText = new TextBlock
+        {
+            Text = "Not yet transcribed",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"],
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(statusText, 0);
+        Grid.SetRow(statusText, 0);
+        card.Children.Add(statusText);
+
+        // Error message
+        if (!string.IsNullOrEmpty(entry.ErrorMessage))
+        {
+            var errorText = new TextBlock
+            {
+                Text = entry.ErrorMessage,
+                TextWrapping = TextWrapping.Wrap,
+                MaxLines = 2,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                FontSize = 12,
+                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            Grid.SetColumn(errorText, 0);
+            Grid.SetRow(errorText, 1);
+            card.Children.Add(errorText);
+        }
+
+        // Action buttons
+        var buttonsPanel = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Spacing = 4,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+
+        var retryButton = new Button
+        {
+            Content = new FontIcon { Glyph = "\uE72C", FontSize = 14 },
+            Padding = new Thickness(8, 6, 8, 6),
+            Tag = entry
+        };
+        ToolTipService.SetToolTip(retryButton, "Retry transcription");
+        retryButton.Click += OnRetryEntry;
+        buttonsPanel.Children.Add(retryButton);
+
+        var deleteButton = new Button
+        {
+            Content = new FontIcon { Glyph = "\uE74D", FontSize = 14 },
+            Padding = new Thickness(8, 6, 8, 6),
+            Tag = entry.Id
+        };
+        ToolTipService.SetToolTip(deleteButton, "Delete");
+        deleteButton.Click += OnDeleteEntry;
+        buttonsPanel.Children.Add(deleteButton);
+
+        Grid.SetColumn(buttonsPanel, 1);
+        Grid.SetRow(buttonsPanel, 0);
+        Grid.SetRowSpan(buttonsPanel, 3);
+        card.Children.Add(buttonsPanel);
+
+        // Meta row: time + model
+        var metaPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+            Margin = new Thickness(0, 6, 0, 0)
+        };
+
+        metaPanel.Children.Add(new TextBlock
+        {
+            Text = entry.TimeDisplay,
+            FontSize = 12,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+        });
+
+        if (!string.IsNullOrEmpty(entry.Model))
+        {
+            metaPanel.Children.Add(new TextBlock
+            {
+                Text = entry.Model,
+                FontSize = 12,
+                Foreground = (Brush)Application.Current.Resources["TextFillColorTertiaryBrush"]
+            });
+        }
+
+        Grid.SetColumn(metaPanel, 0);
+        Grid.SetRow(metaPanel, 2);
+        card.Children.Add(metaPanel);
+
+        border.Child = card;
+        return border;
+    }
+
+    private async void OnRetryEntry(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not TranscriptionEntry entry)
+            return;
+
+        button.IsEnabled = false;
+        ToolTipService.SetToolTip(button, "Retrying...");
+
+        var success = await _viewModel.RetryEntryAsync(entry);
+
+        if (!success)
+        {
+            button.IsEnabled = true;
+            ToolTipService.SetToolTip(button, "Retry transcription");
+        }
+
+        BuildHistoryUI();
     }
 
     private void OnCopyEntry(object sender, RoutedEventArgs e)

@@ -27,17 +27,23 @@ public sealed class DayGroup
 
     private static string FormatSummary(List<TranscriptionEntry> entries)
     {
+        var completed = entries.Where(e => !e.IsPending).ToList();
+        var pendingCount = entries.Count(e => e.IsPending);
         var count = entries.Count;
-        var totalTokens = entries
+
+        var totalTokens = completed
             .Where(e => e.UsageType == "tokens")
             .Sum(e => e.ComputedTotalTokens);
-        var totalSeconds = entries
+        var totalSeconds = completed
             .Where(e => e.UsageType == "duration")
             .Sum(e => e.DurationSeconds ?? 0);
-        var totalCost = entries
+        var totalCost = completed
             .Sum(e => e.CostEur ?? 0m);
 
         var parts = new List<string> { $"{count} transcription{(count != 1 ? "s" : "")}" };
+
+        if (pendingCount > 0)
+            parts.Add($"{pendingCount} pending");
 
         if (totalTokens > 0)
             parts.Add($"{totalTokens} tokens");

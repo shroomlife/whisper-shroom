@@ -136,20 +136,21 @@ public partial class MainViewModel : ObservableObject
 
         CurrentState = AppState.Loading;
 
+        var config = App.ConfigService.Config;
+        var apiKey = config.ApiKey;
+        var language = config.Language;
+        var model = config.Model ?? TranscriptionModelHelper.DefaultModelId;
+
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            ShowSettingsOnError = true;
+            ErrorMessage = "No API key configured. Please add your OpenAI API key in Settings.";
+            CurrentState = AppState.Error;
+            return;
+        }
+
         try
         {
-            var apiKey = App.ConfigService.Config.ApiKey;
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                ShowSettingsOnError = true;
-                ErrorMessage = "No API key configured. Please add your OpenAI API key in Settings.";
-                CurrentState = AppState.Error;
-                return;
-            }
-
-            var config = App.ConfigService.Config;
-            var language = config.Language;
-            var model = config.Model ?? TranscriptionModelHelper.DefaultModelId;
             var result = await Task.Run(() =>
                 App.TranscriptionService.TranscribeAsync(wavData, apiKey, language, model));
 
@@ -185,10 +186,21 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            // Save audio persistently so the user can retry from History
+            var audioPath = SaveAudioFile(wavData);
+            App.HistoryService.AddPendingEntry(audioPath, model, language, ex.Message);
+
             ShowSettingsOnError = ex.Message.Contains("API key", StringComparison.OrdinalIgnoreCase);
             ErrorMessage = ex.Message;
             CurrentState = AppState.Error;
         }
+    }
+
+    private static string SaveAudioFile(byte[] wavData)
+    {
+        var audioPath = Path.Combine(App.HistoryService.AudioDir, $"{Guid.NewGuid()}.wav");
+        File.WriteAllBytes(audioPath, wavData);
+        return audioPath;
     }
 
     private void StopRecording()
