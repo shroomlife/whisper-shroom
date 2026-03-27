@@ -7,6 +7,11 @@ public sealed class HistoryService
 {
     private readonly string _connectionString;
 
+    /// <summary>
+    /// Raised when the history data changes (entry added or deleted).
+    /// </summary>
+    public event Action? Changed;
+
     public HistoryService()
     {
         var dbPath = Path.Combine(
@@ -66,6 +71,7 @@ public sealed class HistoryService
         command.Parameters.AddWithValue("@durationSeconds", (object?)result.DurationSeconds ?? DBNull.Value);
 
         command.ExecuteNonQuery();
+        Changed?.Invoke();
     }
 
     public List<TranscriptionEntry> GetAllEntries()
@@ -112,5 +118,6 @@ public sealed class HistoryService
         command.CommandText = "DELETE FROM transcriptions WHERE id = @id";
         command.Parameters.AddWithValue("@id", id);
         command.ExecuteNonQuery();
+        Changed?.Invoke();
     }
 }

@@ -1,7 +1,9 @@
 using Microsoft.UI;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using WinRT.Interop;
 using WhisperShroom.Helpers;
@@ -14,6 +16,7 @@ public sealed partial class HistoryWindow : Window
 {
     private readonly AppWindow _appWindow;
     private readonly HistoryViewModel _viewModel = new();
+    private readonly DispatcherQueue _dispatcher;
 
     private const int WindowWidth = 650;
     private const int WindowHeight = 600;
@@ -21,6 +24,8 @@ public sealed partial class HistoryWindow : Window
     public HistoryWindow()
     {
         this.InitializeComponent();
+
+        _dispatcher = DispatcherQueue;
 
         var hWnd = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
@@ -45,6 +50,24 @@ public sealed partial class HistoryWindow : Window
 
         CenterOnScreen();
         BuildHistoryUI();
+
+        // React to new transcriptions or deletions from other windows
+        App.HistoryService.Changed += OnHistoryChanged;
+        _appWindow.Closing += OnClosing;
+    }
+
+    private void OnHistoryChanged()
+    {
+        _dispatcher.TryEnqueue(() =>
+        {
+            _viewModel.LoadHistory();
+            BuildHistoryUI();
+        });
+    }
+
+    private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        App.HistoryService.Changed -= OnHistoryChanged;
     }
 
     private void CenterOnScreen()
@@ -74,7 +97,6 @@ public sealed partial class HistoryWindow : Window
 
         foreach (var monthGroup in _viewModel.MonthGroups)
         {
-            // Month level: subtle header, expanded for current month
             var monthExpander = new Expander
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -150,13 +172,19 @@ public sealed partial class HistoryWindow : Window
 
     private UIElement CreateEntryCard(TranscriptionEntry entry)
     {
-        var card = new Grid
+        // Use Border as outer container — it passes pointer wheel events
+        // through to the parent ScrollViewer reliably, unlike Grid with Background
+        var border = new Border
         {
             Padding = new Thickness(12),
             CornerRadius = new CornerRadius(6),
             Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
             BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
-            BorderThickness = new Thickness(1),
+            BorderThickness = new Thickness(1)
+        };
+
+        var card = new Grid
+        {
             ColumnDefinitions =
             {
                 new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) },
@@ -169,7 +197,7 @@ public sealed partial class HistoryWindow : Window
             }
         };
 
-        // Text content
+        // Text content — forward pointer wheel to ScrollViewer
         var textBlock = new TextBlock
         {
             Text = entry.Text,
@@ -199,6 +227,9 @@ public sealed partial class HistoryWindow : Window
         };
         ToolTipService.SetToolTip(copyButton, "Copy");
         copyButton.Click += OnCopyEntry;
+        // Let scroll events pass through the button
+        copyButton.AddHandler(UIElement.PointerWheelChangedEvent,
+            new PointerEventHandler(OnCardPointerWheelChanged), true);
         buttonsPanel.Children.Add(copyButton);
 
         var deleteButton = new Button
@@ -209,6 +240,8 @@ public sealed partial class HistoryWindow : Window
         };
         ToolTipService.SetToolTip(deleteButton, "Delete");
         deleteButton.Click += OnDeleteEntry;
+        deleteButton.AddHandler(UIElement.PointerWheelChangedEvent,
+            new PointerEventHandler(OnCardPointerWheelChanged), true);
         buttonsPanel.Children.Add(deleteButton);
 
         Grid.SetColumn(buttonsPanel, 1);
@@ -266,7 +299,23 @@ public sealed partial class HistoryWindow : Window
         Grid.SetRow(metaPanel, 1);
         card.Children.Add(metaPanel);
 
-        return card;
+        border.Child = card;
+
+        // Forward pointer wheel events from the card border to the ScrollViewer
+        border.AddHandler(UIElement.PointerWheelChangedEvent,
+            new PointerEventHandler(OnCardPointerWheelChanged), true);
+
+        return border;
+    }
+
+    /// <summary>
+    /// Forwards pointer wheel events from card elements to the outer ScrollViewer
+    /// so scrolling works consistently regardless of what the pointer hovers over.
+    /// </summary>
+    private void OnCardPointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        // Mark as not handled so the event bubbles up to the ScrollViewer
+        e.Handled = false;
     }
 
     private void OnCopyEntry(object sender, RoutedEventArgs e)
