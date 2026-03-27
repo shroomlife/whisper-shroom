@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.UI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
@@ -19,8 +18,6 @@ public sealed partial class HistoryWindow : Window
     private readonly HistoryViewModel _viewModel = new();
     private readonly DispatcherQueue _dispatcher;
 
-    // Tracks the intended scroll target independently of VerticalOffset (which lags during animation)
-    private double _scrollTarget = double.NaN;
 
     public HistoryWindow()
     {
@@ -90,7 +87,6 @@ public sealed partial class HistoryWindow : Window
 
     private void BuildHistoryUI()
     {
-        _scrollTarget = double.NaN; // reset so next scroll reads fresh VerticalOffset
         HistoryPanel.Children.Clear();
 
         if (_viewModel.IsEmpty)
@@ -350,29 +346,20 @@ public sealed partial class HistoryWindow : Window
     /// <summary>
     /// Registered on RootGrid (the outermost XAML element) with handledEventsToo=true.
     ///
-    /// Every PointerWheelChanged event from ANY descendant — whether handled by a Button,
-    /// Expander toggle, or untouched by a TextBlock — must pass through RootGrid. This
-    /// guarantees we always drive the ScrollViewer, regardless of what WinUI 3 Expander
-    /// templates do internally.
+    /// The ScrollViewer's native VerticalScrollMode is set to Disabled in XAML, so it never
+    /// processes wheel events itself. This handler is the sole scroll driver — it reads the
+    /// wheel delta, computes the new offset from the current VerticalOffset, and calls
+    /// ChangeView with disableAnimation=true (instant). Because the move is instant,
+    /// VerticalOffset is already up-to-date for the next tick — no accumulation needed.
     /// </summary>
     private void OnRootWheelForward(object sender, PointerRoutedEventArgs e)
     {
         if (HistoryScroller.Visibility != Visibility.Visible) return;
 
-        var point = e.GetCurrentPoint(null);
-        var delta = point.Properties.MouseWheelDelta;
-
-        // Diagnostic logging — visible in VS Output window (Debug > Windows > Output)
-        var source = e.OriginalSource?.GetType().Name ?? "null";
-        Debug.WriteLine($"[Scroll] source={source} handled={e.Handled} delta={delta} " +
-                         $"offset={HistoryScroller.VerticalOffset:F0} scrollable={HistoryScroller.ScrollableHeight:F0} " +
-                         $"target={_scrollTarget:F0}");
-
-        if (double.IsNaN(_scrollTarget))
-            _scrollTarget = HistoryScroller.VerticalOffset;
-
-        _scrollTarget = Math.Max(0, Math.Min(_scrollTarget - delta, HistoryScroller.ScrollableHeight));
-        HistoryScroller.ChangeView(null, _scrollTarget, null, true); // true = instant (no animation lag)
+        var delta = e.GetCurrentPoint(null).Properties.MouseWheelDelta;
+        var newOffset = Math.Max(0,
+            Math.Min(HistoryScroller.VerticalOffset - delta, HistoryScroller.ScrollableHeight));
+        HistoryScroller.ChangeView(null, newOffset, null, true);
         e.Handled = true;
     }
 

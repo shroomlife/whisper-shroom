@@ -30,8 +30,15 @@
                        HorizontalAlignment="Center" />
         </StackPanel>
 
-        <!-- History list — Padding right keeps content clear of the scrollbar -->
-        <ScrollViewer Grid.Row="1" x:Name="HistoryScroller" Padding="0,0,16,0">
+        <!-- History list.
+             VerticalScrollMode="Disabled" prevents the ScrollViewer from processing
+             PointerWheelChanged itself — we drive it entirely via ChangeView in code-behind
+             (OnRootWheelForward). This avoids the native handler and our handler fighting
+             each other, which caused jerky double-scrolling. -->
+        <ScrollViewer Grid.Row="1" x:Name="HistoryScroller"
+                      Padding="0,0,16,0"
+                      VerticalScrollMode="Disabled"
+                      VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="HistoryPanel" Spacing="8" />
         </ScrollViewer>
     </Grid>
