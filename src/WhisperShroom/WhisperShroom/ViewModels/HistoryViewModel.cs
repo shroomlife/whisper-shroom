@@ -46,4 +46,16 @@ public partial class HistoryViewModel : ObservableObject
         App.HistoryService.DeleteEntry(id);
         LoadHistory();
     }
+
+    public void DeleteDay(DateTime date)
+    {
+        App.HistoryService.DeleteEntriesByDate(date);
+        LoadHistory();
+    }
+
+    public void DeleteAll()
+    {
+        App.HistoryService.DeleteAllEntries();
+        LoadHistory();
+    }
 }

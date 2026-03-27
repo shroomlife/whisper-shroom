@@ -32,7 +32,9 @@
 
         <!-- History list -->
         <ScrollViewer Grid.Row="1" x:Name="HistoryScroller">
-            <StackPanel x:Name="HistoryPanel" Spacing="8" />
+            <StackPanel x:Name="HistoryPanel" Spacing="8">
+                <!-- Day entries + "Clear All" button are added in code-behind -->
+            </StackPanel>
         </ScrollViewer>
     </Grid>
 </Window>

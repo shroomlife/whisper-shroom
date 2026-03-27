@@ -160,6 +160,31 @@ public sealed partial class HistoryWindow : Window
                 {
                     entriesPanel.Children.Add(CreateEntryCard(entry));
                 }
+
+                // "Delete Day" button at the bottom of the day
+                var deleteDayButton = new Button
+                {
+                    Content = new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Spacing = 8,
+                        Children =
+                        {
+                            new FontIcon { Glyph = "\uE74D", FontSize = 13 },
+                            new TextBlock { Text = "Delete this day" }
+                        }
+                    },
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Margin = new Thickness(0, 8, 0, 0),
+                    Padding = new Thickness(12, 6, 12, 6),
+                    Tag = dayGroup.Date
+                };
+                ToolTipService.SetToolTip(deleteDayButton, $"Delete all transcriptions from {dayGroup.DateLabel}");
+                deleteDayButton.Click += OnDeleteDay;
+                deleteDayButton.AddHandler(UIElement.PointerWheelChangedEvent,
+                    new PointerEventHandler(OnCardPointerWheelChanged), true);
+                entriesPanel.Children.Add(deleteDayButton);
+
                 dayExpander.Content = entriesPanel;
 
                 daysPanel.Children.Add(dayExpander);
@@ -168,6 +193,29 @@ public sealed partial class HistoryWindow : Window
             monthExpander.Content = daysPanel;
             HistoryPanel.Children.Add(monthExpander);
         }
+
+        // "Clear All History" button at the very bottom
+        var clearAllButton = new Button
+        {
+            Content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                Children =
+                {
+                    new FontIcon { Glyph = "\uE74D", FontSize = 14 },
+                    new TextBlock { Text = "Clear all history" }
+                }
+            },
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 16, 0, 8),
+            Padding = new Thickness(16, 8, 16, 8)
+        };
+        ToolTipService.SetToolTip(clearAllButton, "Delete all transcriptions");
+        clearAllButton.Click += OnClearAllHistory;
+        clearAllButton.AddHandler(UIElement.PointerWheelChangedEvent,
+            new PointerEventHandler(OnCardPointerWheelChanged), true);
+        HistoryPanel.Children.Add(clearAllButton);
     }
 
     private UIElement CreateEntryCard(TranscriptionEntry entry)
@@ -347,6 +395,55 @@ public sealed partial class HistoryWindow : Window
         if (result == ContentDialogResult.Primary)
         {
             _viewModel.DeleteEntry(id);
+            BuildHistoryUI();
+        }
+    }
+
+    private async void OnDeleteDay(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not DateTime date)
+            return;
+
+        var dateLabel = date == DateTime.Today ? "today"
+            : date == DateTime.Today.AddDays(-1) ? "yesterday"
+            : date.ToString("MMMM d, yyyy");
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete Day",
+            Content = $"Are you sure you want to delete all transcriptions from {dateLabel}? This cannot be undone.",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+
+        if (result == ContentDialogResult.Primary)
+        {
+            _viewModel.DeleteDay(date);
+            BuildHistoryUI();
+        }
+    }
+
+    private async void OnClearAllHistory(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = "Clear All History",
+            Content = "Are you sure you want to delete ALL transcriptions? This cannot be undone.",
+            PrimaryButtonText = "Delete All",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+
+        if (result == ContentDialogResult.Primary)
+        {
+            _viewModel.DeleteAll();
             BuildHistoryUI();
         }
     }

@@ -120,4 +120,27 @@ public sealed class HistoryService
         command.ExecuteNonQuery();
         Changed?.Invoke();
     }
+
+    public void DeleteEntriesByDate(DateTime date)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM transcriptions WHERE date(timestamp, 'localtime') = @date";
+        command.Parameters.AddWithValue("@date", date.ToString("yyyy-MM-dd"));
+        command.ExecuteNonQuery();
+        Changed?.Invoke();
+    }
+
+    public void DeleteAllEntries()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM transcriptions";
+        command.ExecuteNonQuery();
+        Changed?.Invoke();
+    }
 }
