@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.UI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
@@ -21,9 +22,6 @@ public sealed partial class HistoryWindow : Window
     // Tracks the intended scroll target independently of VerticalOffset (which lags during animation)
     private double _scrollTarget = double.NaN;
 
-    private const int WindowWidth = 650;
-    private const int WindowHeight = 600;
-
     public HistoryWindow()
     {
         this.InitializeComponent();
@@ -34,7 +32,13 @@ public sealed partial class HistoryWindow : Window
         var windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
         _appWindow = AppWindow.GetFromWindowId(windowId);
 
-        _appWindow.Resize(new Windows.Graphics.SizeInt32(WindowWidth, WindowHeight));
+        // Size the window to roughly 1/4 of the screen area
+        var displayArea = DisplayArea.GetFromWindowId(_appWindow.Id, DisplayAreaFallback.Primary);
+        var workArea = displayArea.WorkArea;
+        var windowWidth = workArea.Width / 2;
+        var windowHeight = workArea.Height / 2;
+
+        _appWindow.Resize(new Windows.Graphics.SizeInt32(windowWidth, windowHeight));
         _appWindow.Title = "WhisperShroom - History";
 
         if (_appWindow.Presenter is OverlappedPresenter presenter)
@@ -51,16 +55,19 @@ public sealed partial class HistoryWindow : Window
         }
         catch { }
 
-        CenterOnScreen();
+        // Center using actual window size
+        var x = (workArea.Width - windowWidth) / 2 + workArea.X;
+        var y = (workArea.Height - windowHeight) / 2 + workArea.Y;
+        _appWindow.Move(new Windows.Graphics.PointInt32(x, y));
+
         BuildHistoryUI();
 
-        // Attach AFTER BuildHistoryUI so HistoryPanel exists in the visual tree.
-        // Handler on HistoryPanel (not HistoryScroller) because WinUI 3 Expander content
-        // bubbling can fail to reach the ScrollViewer level reliably.
-        // handledEventsToo=true catches Buttons & Expander-header events that are
-        // already marked Handled; we then drive ChangeView ourselves.
-        HistoryPanel.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnScrollerWheelForward), true);
+        // Scroll handler on RootGrid (the outermost XAML element) with handledEventsToo=true.
+        // This is the nuclear option: every PointerWheelChanged event from ANY child element
+        // must bubble through RootGrid, regardless of what Expander templates do internally.
+        // We drive HistoryScroller.ChangeView ourselves for all wheel events.
+        RootGrid.AddHandler(UIElement.PointerWheelChangedEvent,
+            new PointerEventHandler(OnRootWheelForward), true);
 
         // React to new transcriptions or deletions from other windows
         App.HistoryService.Changed += OnHistoryChanged;
@@ -79,17 +86,6 @@ public sealed partial class HistoryWindow : Window
     private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         App.HistoryService.Changed -= OnHistoryChanged;
-    }
-
-    private void CenterOnScreen()
-    {
-        var displayArea = DisplayArea.GetFromWindowId(
-            _appWindow.Id, DisplayAreaFallback.Primary);
-        var workArea = displayArea.WorkArea;
-
-        var x = (workArea.Width - WindowWidth) / 2 + workArea.X;
-        var y = (workArea.Height - WindowHeight) / 2 + workArea.Y;
-        _appWindow.Move(new Windows.Graphics.PointInt32(x, y));
     }
 
     private void BuildHistoryUI()
@@ -228,8 +224,6 @@ public sealed partial class HistoryWindow : Window
 
     private UIElement CreateEntryCard(TranscriptionEntry entry)
     {
-        // Use Border as outer container — it passes pointer wheel events
-        // through to the parent ScrollViewer reliably, unlike Grid with Background
         var border = new Border
         {
             Padding = new Thickness(12),
@@ -253,7 +247,6 @@ public sealed partial class HistoryWindow : Window
             }
         };
 
-        // Text content — forward pointer wheel to ScrollViewer
         var textBlock = new TextBlock
         {
             Text = entry.Text,
@@ -355,24 +348,32 @@ public sealed partial class HistoryWindow : Window
     }
 
     /// <summary>
-    /// Registered on HistoryPanel (the StackPanel inside the ScrollViewer) with handledEventsToo=true.
+    /// Registered on RootGrid (the outermost XAML element) with handledEventsToo=true.
     ///
-    /// Catches ALL wheel events from children — whether or not they were already marked Handled
-    /// by a Button or Expander toggle button. Drives the parent HistoryScroller directly via
-    /// ChangeView so the ScrollViewer always scrolls regardless of which element the pointer is over.
-    ///
-    /// _scrollTarget accumulates deltas independently of VerticalOffset so rapid successive ticks
-    /// (before the animated scroll finishes) compute the correct next target.
+    /// Every PointerWheelChanged event from ANY descendant — whether handled by a Button,
+    /// Expander toggle, or untouched by a TextBlock — must pass through RootGrid. This
+    /// guarantees we always drive the ScrollViewer, regardless of what WinUI 3 Expander
+    /// templates do internally.
     /// </summary>
-    private void OnScrollerWheelForward(object sender, PointerRoutedEventArgs e)
+    private void OnRootWheelForward(object sender, PointerRoutedEventArgs e)
     {
-        var delta = e.GetCurrentPoint(null).Properties.MouseWheelDelta;
+        if (HistoryScroller.Visibility != Visibility.Visible) return;
+
+        var point = e.GetCurrentPoint(null);
+        var delta = point.Properties.MouseWheelDelta;
+
+        // Diagnostic logging — visible in VS Output window (Debug > Windows > Output)
+        var source = e.OriginalSource?.GetType().Name ?? "null";
+        Debug.WriteLine($"[Scroll] source={source} handled={e.Handled} delta={delta} " +
+                         $"offset={HistoryScroller.VerticalOffset:F0} scrollable={HistoryScroller.ScrollableHeight:F0} " +
+                         $"target={_scrollTarget:F0}");
+
         if (double.IsNaN(_scrollTarget))
             _scrollTarget = HistoryScroller.VerticalOffset;
 
         _scrollTarget = Math.Max(0, Math.Min(_scrollTarget - delta, HistoryScroller.ScrollableHeight));
-        HistoryScroller.ChangeView(null, _scrollTarget, null, false);
-        e.Handled = true; // prevent the event reaching HistoryScroller's native handler (avoids double-scroll)
+        HistoryScroller.ChangeView(null, _scrollTarget, null, true); // true = instant (no animation lag)
+        e.Handled = true;
     }
 
     private void OnCopyEntry(object sender, RoutedEventArgs e)
