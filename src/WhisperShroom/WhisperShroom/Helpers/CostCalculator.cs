@@ -72,8 +72,8 @@ internal static class CostCalculator
             return $"{cents:F2} ct";
 
         if (costEur < 1m)
-            return $"{costEur:F4} EUR";
+            return $"{costEur:F4} €";
 
-        return $"{costEur:F2} EUR";
+        return $"{costEur:F2} €";
     }
 }

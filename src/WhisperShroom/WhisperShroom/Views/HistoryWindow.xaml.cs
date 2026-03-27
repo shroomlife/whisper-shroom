@@ -52,6 +52,15 @@ public sealed partial class HistoryWindow : Window
         catch { }
 
         CenterOnScreen();
+
+        // Single wheel-scroll forwarder on the ScrollViewer itself (handledEventsToo).
+        // Children that consume PointerWheelChanged (Buttons, Expander toggle buttons) set
+        // e.Handled = true, so the ScrollViewer's native handler never fires for them.
+        // We catch those here and call ChangeView. For un-handled events (TextBlock, StackPanel…)
+        // we return immediately so the ScrollViewer's built-in behaviour runs as normal.
+        HistoryScroller.AddHandler(UIElement.PointerWheelChangedEvent,
+            new PointerEventHandler(OnScrollerWheelForward), true);
+
         BuildHistoryUI();
 
         // React to new transcriptions or deletions from other windows
@@ -108,8 +117,6 @@ public sealed partial class HistoryWindow : Window
                 IsExpanded = monthGroup.IsCurrentMonth,
                 Margin = new Thickness(0, 0, 0, 8)
             };
-            monthExpander.AddHandler(UIElement.PointerWheelChangedEvent,
-                new PointerEventHandler(OnForwardScroll), true);
 
             // Month header
             var monthHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
@@ -142,8 +149,6 @@ public sealed partial class HistoryWindow : Window
                     Margin = new Thickness(0, 0, 0, 2),
                     Padding = new Thickness(0)
                 };
-                dayExpander.AddHandler(UIElement.PointerWheelChangedEvent,
-                    new PointerEventHandler(OnForwardScroll), true);
 
                 // Day header
                 var dayHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
@@ -189,8 +194,6 @@ public sealed partial class HistoryWindow : Window
                 };
                 ToolTipService.SetToolTip(deleteDayButton, $"Delete all transcriptions from {dayGroup.DateLabel}");
                 deleteDayButton.Click += OnDeleteDay;
-                deleteDayButton.AddHandler(UIElement.PointerWheelChangedEvent,
-                    new PointerEventHandler(OnForwardScroll), true);
                 entriesPanel.Children.Add(deleteDayButton);
 
                 dayExpander.Content = entriesPanel;
@@ -221,8 +224,6 @@ public sealed partial class HistoryWindow : Window
         };
         ToolTipService.SetToolTip(clearAllButton, "Delete all transcriptions");
         clearAllButton.Click += OnClearAllHistory;
-        clearAllButton.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnForwardScroll), true);
         HistoryPanel.Children.Add(clearAllButton);
     }
 
@@ -283,8 +284,6 @@ public sealed partial class HistoryWindow : Window
         };
         ToolTipService.SetToolTip(copyButton, "Copy");
         copyButton.Click += OnCopyEntry;
-        copyButton.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnForwardScroll), true);
         buttonsPanel.Children.Add(copyButton);
 
         var deleteButton = new Button
@@ -295,8 +294,6 @@ public sealed partial class HistoryWindow : Window
         };
         ToolTipService.SetToolTip(deleteButton, "Delete");
         deleteButton.Click += OnDeleteEntry;
-        deleteButton.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnForwardScroll), true);
         buttonsPanel.Children.Add(deleteButton);
 
         Grid.SetColumn(buttonsPanel, 1);
@@ -359,28 +356,29 @@ public sealed partial class HistoryWindow : Window
     }
 
     /// <summary>
-    /// Forwards pointer wheel events from elements that consume them (Buttons, Expander headers)
-    /// directly to the outer ScrollViewer via ChangeView.
+    /// Registered on HistoryScroller with handledEventsToo=true.
     ///
-    /// Why not just set e.Handled = false and let it bubble?
-    ///   WinUI 3 Buttons mark PointerWheelChanged as Handled at the control level — resetting
-    ///   Handled to false in a handledEventsToo handler does not re-enable bubbling in WinRT.
+    /// Strategy: one handler at the ScrollViewer level instead of on individual children.
     ///
-    /// Why track _scrollTarget instead of reading VerticalOffset?
-    ///   ChangeView with animation is async; VerticalOffset doesn't update until the animation
-    ///   completes. Rapid wheel ticks would all compute the same target (from the stale offset),
-    ///   making the list barely move. Accumulating into _scrollTarget fixes this.
+    /// • e.Handled == false → a non-consuming element (TextBlock, StackPanel, Border…) produced
+    ///   the event. The ScrollViewer's own built-in handler will fire for these — return early so
+    ///   we don't interfere and cause double-scrolling.
+    ///
+    /// • e.Handled == true  → a Button or Expander toggle-button consumed the event, so the
+    ///   ScrollViewer's native handler is suppressed. We call ChangeView manually.
+    ///   _scrollTarget accumulates deltas independently of VerticalOffset (which lags during
+    ///   animation) so rapid wheel ticks don't all collapse to the same target.
     /// </summary>
-    private void OnForwardScroll(object sender, PointerRoutedEventArgs e)
+    private void OnScrollerWheelForward(object sender, PointerRoutedEventArgs e)
     {
+        if (!e.Handled) return; // ScrollViewer handles unhandled events natively — don't double-scroll
+
         var delta = e.GetCurrentPoint(null).Properties.MouseWheelDelta;
-        // Fall back to current offset the first time (after a list rebuild)
         if (double.IsNaN(_scrollTarget))
             _scrollTarget = HistoryScroller.VerticalOffset;
 
         _scrollTarget = Math.Max(0, Math.Min(_scrollTarget - delta, HistoryScroller.ScrollableHeight));
-        HistoryScroller.ChangeView(null, _scrollTarget, null, false); // false = keep smooth animation
-        e.Handled = true;
+        HistoryScroller.ChangeView(null, _scrollTarget, null, false);
     }
 
     private void OnCopyEntry(object sender, RoutedEventArgs e)
