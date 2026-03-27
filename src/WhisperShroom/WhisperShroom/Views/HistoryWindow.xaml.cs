@@ -59,12 +59,14 @@ public sealed partial class HistoryWindow : Window
 
         BuildHistoryUI();
 
-        // Scroll handler on RootGrid (the outermost XAML element) with handledEventsToo=true.
-        // This is the nuclear option: every PointerWheelChanged event from ANY child element
-        // must bubble through RootGrid, regardless of what Expander templates do internally.
-        // We drive HistoryScroller.ChangeView ourselves for all wheel events.
-        RootGrid.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnRootWheelForward), true);
+        // Ensure scroll events from child elements (Buttons, Expander toggle-buttons) reach
+        // the ScrollViewer as unhandled. Some WinUI 3 controls mark PointerWheelChanged as
+        // Handled internally, which prevents the parent ScrollViewer from scrolling.
+        // By resetting Handled=false at the HistoryPanel level (which sits inside the
+        // ScrollViewer), ALL wheel events arrive at the ScrollViewer as unhandled and are
+        // processed natively — smooth scrolling, scrollbar drag, touch, everything works.
+        HistoryPanel.AddHandler(UIElement.PointerWheelChangedEvent,
+            new PointerEventHandler((_, e) => e.Handled = false), true);
 
         // React to new transcriptions or deletions from other windows
         App.HistoryService.Changed += OnHistoryChanged;
@@ -341,26 +343,6 @@ public sealed partial class HistoryWindow : Window
 
         border.Child = card;
         return border;
-    }
-
-    /// <summary>
-    /// Registered on RootGrid (the outermost XAML element) with handledEventsToo=true.
-    ///
-    /// The ScrollViewer's native VerticalScrollMode is set to Disabled in XAML, so it never
-    /// processes wheel events itself. This handler is the sole scroll driver — it reads the
-    /// wheel delta, computes the new offset from the current VerticalOffset, and calls
-    /// ChangeView with disableAnimation=true (instant). Because the move is instant,
-    /// VerticalOffset is already up-to-date for the next tick — no accumulation needed.
-    /// </summary>
-    private void OnRootWheelForward(object sender, PointerRoutedEventArgs e)
-    {
-        if (HistoryScroller.Visibility != Visibility.Visible) return;
-
-        var delta = e.GetCurrentPoint(null).Properties.MouseWheelDelta;
-        var newOffset = Math.Max(0,
-            Math.Min(HistoryScroller.VerticalOffset - delta, HistoryScroller.ScrollableHeight));
-        HistoryScroller.ChangeView(null, newOffset, null, true);
-        e.Handled = true;
     }
 
     private void OnCopyEntry(object sender, RoutedEventArgs e)

@@ -9,7 +9,7 @@
 
   <Identity Name="shroomlife.WhisperShroom"
             Publisher="CN=300350BD-2924-497D-B5A0-BFB05ED75742"
-            Version="1.7.7.4"
+            Version="1.7.7.5"
             ProcessorArchitecture="x64" />
 
   <Properties>
