@@ -11,6 +11,7 @@ public partial class App : Application
     public static TranscriptionService TranscriptionService { get; } = new();
     public static HotkeyService HotkeyService { get; } = new();
     public static NotificationService NotificationService { get; } = new();
+    public static HistoryService HistoryService { get; } = new();
 
     public static MainViewModel MainViewModel { get; private set; } = null!;
     public static Views.MainWindow MainAppWindow { get; private set; } = null!;
@@ -56,6 +57,7 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         ConfigService.Load();
+        HistoryService.InitializeDatabase();
         NotificationService.Register();
         MainViewModel = new MainViewModel();
 

@@ -46,5 +46,6 @@
     </PackageReference>
     <PackageReference Include="NAudio" Version="2.*" />
     <PackageReference Include="H.NotifyIcon.WinUI" Version="2.*" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.*" />
   </ItemGroup>
 </Project>

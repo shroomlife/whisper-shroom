@@ -14,9 +14,13 @@ public sealed partial class MainWindow : Window
     private readonly AppWindow _appWindow;
     private TaskbarIcon? _trayIcon;
 
+    private const int WindowWidth = 600;
+    private const int WindowHeight = 500;
+
     private const uint MenuId_ToggleRecording = 1;
     private const uint MenuId_Settings = 2;
     private const uint MenuId_Quit = 3;
+    private const uint MenuId_History = 4;
     private const uint MenuId_DefaultDevice = 100;
     private const uint MenuId_DeviceBase = 101;
 
@@ -34,7 +38,7 @@ public sealed partial class MainWindow : Window
 
     private void ConfigureWindow()
     {
-        _appWindow.Resize(new Windows.Graphics.SizeInt32(560, 420));
+        _appWindow.Resize(new Windows.Graphics.SizeInt32(WindowWidth, WindowHeight));
 
         if (_appWindow.Presenter is OverlappedPresenter presenter)
         {
@@ -148,6 +152,9 @@ public sealed partial class MainWindow : Window
             NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING,
                 MenuId_Settings, "Settings");
 
+            NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING,
+                MenuId_History, "History");
+
             NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_SEPARATOR, 0, null);
 
             NativeMenu.AppendMenuW(hMenu, NativeMenu.MF_STRING,
@@ -183,6 +190,9 @@ public sealed partial class MainWindow : Window
                 break;
             case MenuId_Settings:
                 ShowSettingsWindow();
+                break;
+            case MenuId_History:
+                ShowHistoryWindow();
                 break;
             case MenuId_Quit:
                 App.MainViewModel.QuitCommand.Execute(null);
@@ -225,8 +235,8 @@ public sealed partial class MainWindow : Window
             _appWindow.Id, DisplayAreaFallback.Primary);
         var workArea = displayArea.WorkArea;
 
-        var x = (workArea.Width - 560) / 2 + workArea.X;
-        var y = (workArea.Height - 420) / 2 + workArea.Y;
+        var x = (workArea.Width - WindowWidth) / 2 + workArea.X;
+        var y = (workArea.Height - WindowHeight) / 2 + workArea.Y;
         _appWindow.Move(new Windows.Graphics.PointInt32(x, y));
     }
 
@@ -262,6 +272,12 @@ public sealed partial class MainWindow : Window
         _trayIcon = null;
         _appWindow.Closing -= OnClosing;
         this.Close();
+    }
+
+    public void ShowHistoryWindow()
+    {
+        var historyWindow = new HistoryWindow();
+        historyWindow.Activate();
     }
 
     public void ShowSettingsWindow()

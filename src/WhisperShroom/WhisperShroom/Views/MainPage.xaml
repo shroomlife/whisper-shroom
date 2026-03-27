@@ -105,11 +105,12 @@
                       Visibility="{x:Bind BoolToVisible(ViewModel.HasPrefix), Mode=OneWay}"
                       Margin="0,0,0,4" />
 
-            <ScrollViewer Grid.Row="2" Margin="0,0,0,4">
+            <ScrollViewer Grid.Row="2" Margin="0,0,0,4"
+                          VerticalScrollBarVisibility="Auto">
                 <TextBox Text="{x:Bind ViewModel.ResultText, Mode=TwoWay}"
                          TextWrapping="Wrap"
                          AcceptsReturn="True"
-                         MinHeight="150"
+                         MinHeight="200"
                          Padding="12" />
             </ScrollViewer>
 

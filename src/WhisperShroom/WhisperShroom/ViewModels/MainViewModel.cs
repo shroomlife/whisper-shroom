@@ -150,10 +150,10 @@ public partial class MainViewModel : ObservableObject
             var config = App.ConfigService.Config;
             var language = config.Language;
             var model = config.Model ?? TranscriptionModelHelper.DefaultModelId;
-            var text = await Task.Run(() =>
+            var result = await Task.Run(() =>
                 App.TranscriptionService.TranscribeAsync(wavData, apiKey, language, model));
 
-            var trimmed = text.Trim();
+            var trimmed = result.Text.Trim();
 
             if (HallucinationFilter.IsHallucination(trimmed))
             {
@@ -163,6 +163,9 @@ public partial class MainViewModel : ObservableObject
             }
 
             ResultText = trimmed;
+
+            var entryResult = result with { Text = trimmed };
+            App.HistoryService.AddEntry(entryResult, model, language);
             HasPrefix = !string.IsNullOrEmpty(config.PromptPrefix);
             HasSuffix = !string.IsNullOrEmpty(config.PromptSuffix);
             IncludePrefix = true;

@@ -31,19 +31,23 @@ The app follows **MVVM** (CommunityToolkit.Mvvm) with clearly separated layers:
 src/WhisperShroom/WhisperShroom/
   Program.cs              # Entry point, single-instance (AppLifecycle API)
   App.xaml.cs             # Application init, static service references
-  Models/                 # AppState enum, AppConfig POCO, AudioDevice record
+  Models/                 # AppState enum, AppConfig POCO, AudioDevice record, TranscriptionResult/Entry
   Services/
     ConfigService.cs      # JSON config at %APPDATA%\WhisperShroom\config.json
     AudioService.cs       # NAudio WasapiCapture, silence detection (RMS)
-    TranscriptionService.cs  # HttpClient -> OpenAI Whisper API
+    TranscriptionService.cs  # HttpClient -> OpenAI Whisper API (returns TranscriptionResult with usage)
+    HistoryService.cs     # SQLite persistence at %APPDATA%\WhisperShroom\history.db
     HotkeyService.cs      # Win32 RegisterHotKey via CsWin32 P/Invoke
     HallucinationFilter.cs   # Known German Whisper hallucination strings
   ViewModels/
     MainViewModel.cs      # State machine (Ready/Recording/Loading/Result/Error)
     SettingsViewModel.cs  # Settings dialog logic
+    HistoryViewModel.cs   # History grouping by day, delete
+    DayGroup.cs           # Day-grouped transcription entries with summary
   Views/
-    MainWindow.xaml       # Window shell (always-on-top, 560x420)
+    MainWindow.xaml       # Window shell (always-on-top, 600x500)
     MainPage.xaml         # 5 state panels, visibility-bound to CurrentState
+    HistoryWindow.xaml    # History view with collapsible day groups
     SettingsDialog.xaml   # ContentDialog for API key, mic, hotkey
   Helpers/
     HotkeyParser.cs       # "ctrl+shift+e" -> Win32 modifier flags + VK code
@@ -61,6 +65,7 @@ src/WhisperShroom/WhisperShroom/
 | Tray Icon | H.NotifyIcon.WinUI | WinUI 3-compatible system tray (icon + click detection only) |
 | Tray Context Menu | Win32 TrackPopupMenuEx (manual P/Invoke) | H.NotifyIcon's menu modes have positioning/sizing bugs |
 | OpenAI API | HttpClient (no SDK) | Single endpoint, minimal dependencies |
+| History DB | Microsoft.Data.Sqlite | MS-recommended for WinUI 3, uses Windows-bundled SQLite |
 | Deployment | MSIX packaged (sideloaded) | App identity for clipboard, proper install/update |
 
 ### State Machine
@@ -89,5 +94,5 @@ src/WhisperShroom/WhisperShroom/
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.6.0.0**
+- Current version: **1.7.0.0**
 - Bump the version with every release build / bug fix round.

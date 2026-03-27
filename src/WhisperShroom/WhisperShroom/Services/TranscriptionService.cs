@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using WhisperShroom.Helpers;
+using WhisperShroom.Models;
 
 namespace WhisperShroom.Services;
 
@@ -85,17 +86,23 @@ public sealed class TranscriptionService : IDisposable
             .ToList();
     }
 
-    public async Task<string> TranscribeAsync(byte[] wavData, string apiKey, string? language = null, string? model = null, CancellationToken ct = default)
+    public async Task<TranscriptionResult> TranscribeAsync(byte[] wavData, string apiKey, string? language = null, string? model = null, CancellationToken ct = default)
     {
         using var content = new MultipartFormDataContent();
+
+        var effectiveModel = model ?? TranscriptionModelHelper.DefaultModelId;
 
         var fileContent = new ByteArrayContent(wavData);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
         content.Add(fileContent, "file", "recording.wav");
-        content.Add(new StringContent(model ?? TranscriptionModelHelper.DefaultModelId), "model");
+        content.Add(new StringContent(effectiveModel), "model");
 
         if (language is not null)
             content.Add(new StringContent(language), "language");
+
+        // whisper-1 needs verbose_json to get duration; gpt-4o-transcribe models return usage in json
+        if (effectiveModel == "whisper-1")
+            content.Add(new StringContent("verbose_json"), "response_format");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/audio/transcriptions");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
@@ -122,7 +129,44 @@ public sealed class TranscriptionService : IDisposable
         var json = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(json);
 
-        return doc.RootElement.GetProperty("text").GetString() ?? "";
+        var text = doc.RootElement.GetProperty("text").GetString() ?? "";
+        var result = new TranscriptionResult { Text = text };
+
+        if (doc.RootElement.TryGetProperty("usage", out var usage))
+        {
+            var usageType = usage.TryGetProperty("type", out var typeProp)
+                ? typeProp.GetString()
+                : null;
+
+            if (usageType == "tokens")
+            {
+                int? audioTokens = null;
+                if (usage.TryGetProperty("input_token_details", out var details) &&
+                    details.TryGetProperty("audio_tokens", out var audioProp))
+                {
+                    audioTokens = audioProp.GetInt32();
+                }
+
+                result = result with
+                {
+                    UsageType = "tokens",
+                    InputTokens = usage.GetProperty("input_tokens").GetInt32(),
+                    OutputTokens = usage.GetProperty("output_tokens").GetInt32(),
+                    TotalTokens = usage.GetProperty("total_tokens").GetInt32(),
+                    AudioTokens = audioTokens
+                };
+            }
+            else if (usageType == "duration")
+            {
+                result = result with
+                {
+                    UsageType = "duration",
+                    DurationSeconds = usage.GetProperty("seconds").GetInt32()
+                };
+            }
+        }
+
+        return result;
     }
 
     public void Dispose()
