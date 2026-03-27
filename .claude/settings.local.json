@@ -15,7 +15,8 @@
       "mcp__OpenAI-Developer-Docs__fetch_openai_doc",
       "mcp__OpenAI-Developer-Docs__get_openapi_spec",
       "mcp__OpenAI-Developer-Docs__list_api_endpoints",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(gh issue:*)"
     ]
   }
 }

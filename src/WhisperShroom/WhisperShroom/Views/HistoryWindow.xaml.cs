@@ -108,7 +108,10 @@ public sealed partial class HistoryWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 IsExpanded = monthGroup.IsCurrentMonth,
-                Margin = new Thickness(0, 0, 0, 8)
+                Margin = new Thickness(0, 0, 0, 8),
+                // Prevents Expander from capturing DirectManipulation, letting the
+                // parent ScrollViewer handle scroll input at the compositor level.
+                ManipulationMode = ManipulationModes.System
             };
 
             // Month header
@@ -140,7 +143,8 @@ public sealed partial class HistoryWindow : Window
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
                     IsExpanded = dayGroup.Date == DateTime.Today,
                     Margin = new Thickness(0, 0, 0, 2),
-                    Padding = new Thickness(0)
+                    Padding = new Thickness(0),
+                    ManipulationMode = ManipulationModes.System
                 };
 
                 // Day header
@@ -228,7 +232,8 @@ public sealed partial class HistoryWindow : Window
             CornerRadius = new CornerRadius(6),
             Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
             BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
-            BorderThickness = new Thickness(1)
+            BorderThickness = new Thickness(1),
+            ManipulationMode = ManipulationModes.System
         };
 
         var card = new Grid
