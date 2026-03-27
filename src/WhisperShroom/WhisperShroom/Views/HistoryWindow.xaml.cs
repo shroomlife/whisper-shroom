@@ -18,6 +18,9 @@ public sealed partial class HistoryWindow : Window
     private readonly HistoryViewModel _viewModel = new();
     private readonly DispatcherQueue _dispatcher;
 
+    // Tracks the intended scroll target independently of VerticalOffset (which lags during animation)
+    private double _scrollTarget = double.NaN;
+
     private const int WindowWidth = 650;
     private const int WindowHeight = 600;
 
@@ -83,6 +86,7 @@ public sealed partial class HistoryWindow : Window
 
     private void BuildHistoryUI()
     {
+        _scrollTarget = double.NaN; // reset so next scroll reads fresh VerticalOffset
         HistoryPanel.Children.Clear();
 
         if (_viewModel.IsEmpty)
@@ -104,6 +108,8 @@ public sealed partial class HistoryWindow : Window
                 IsExpanded = monthGroup.IsCurrentMonth,
                 Margin = new Thickness(0, 0, 0, 8)
             };
+            monthExpander.AddHandler(UIElement.PointerWheelChangedEvent,
+                new PointerEventHandler(OnForwardScroll), true);
 
             // Month header
             var monthHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
@@ -136,6 +142,8 @@ public sealed partial class HistoryWindow : Window
                     Margin = new Thickness(0, 0, 0, 2),
                     Padding = new Thickness(0)
                 };
+                dayExpander.AddHandler(UIElement.PointerWheelChangedEvent,
+                    new PointerEventHandler(OnForwardScroll), true);
 
                 // Day header
                 var dayHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
@@ -155,7 +163,7 @@ public sealed partial class HistoryWindow : Window
                 dayExpander.Header = dayHeader;
 
                 // Entries inside the day
-                var entriesPanel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 0) };
+                var entriesPanel = new StackPanel { Spacing = 6, Margin = new Thickness(8, 6, 8, 0) };
                 foreach (var entry in dayGroup.Entries)
                 {
                     entriesPanel.Children.Add(CreateEntryCard(entry));
@@ -182,7 +190,7 @@ public sealed partial class HistoryWindow : Window
                 ToolTipService.SetToolTip(deleteDayButton, $"Delete all transcriptions from {dayGroup.DateLabel}");
                 deleteDayButton.Click += OnDeleteDay;
                 deleteDayButton.AddHandler(UIElement.PointerWheelChangedEvent,
-                    new PointerEventHandler(OnCardPointerWheelChanged), true);
+                    new PointerEventHandler(OnForwardScroll), true);
                 entriesPanel.Children.Add(deleteDayButton);
 
                 dayExpander.Content = entriesPanel;
@@ -214,7 +222,7 @@ public sealed partial class HistoryWindow : Window
         ToolTipService.SetToolTip(clearAllButton, "Delete all transcriptions");
         clearAllButton.Click += OnClearAllHistory;
         clearAllButton.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnCardPointerWheelChanged), true);
+            new PointerEventHandler(OnForwardScroll), true);
         HistoryPanel.Children.Add(clearAllButton);
     }
 
@@ -275,9 +283,8 @@ public sealed partial class HistoryWindow : Window
         };
         ToolTipService.SetToolTip(copyButton, "Copy");
         copyButton.Click += OnCopyEntry;
-        // Let scroll events pass through the button
         copyButton.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnCardPointerWheelChanged), true);
+            new PointerEventHandler(OnForwardScroll), true);
         buttonsPanel.Children.Add(copyButton);
 
         var deleteButton = new Button
@@ -289,7 +296,7 @@ public sealed partial class HistoryWindow : Window
         ToolTipService.SetToolTip(deleteButton, "Delete");
         deleteButton.Click += OnDeleteEntry;
         deleteButton.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnCardPointerWheelChanged), true);
+            new PointerEventHandler(OnForwardScroll), true);
         buttonsPanel.Children.Add(deleteButton);
 
         Grid.SetColumn(buttonsPanel, 1);
@@ -348,25 +355,31 @@ public sealed partial class HistoryWindow : Window
         card.Children.Add(metaPanel);
 
         border.Child = card;
-
-        // Forward pointer wheel events from the card border to the ScrollViewer
-        border.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnCardPointerWheelChanged), true);
-
         return border;
     }
 
     /// <summary>
-    /// Forwards pointer wheel events from card elements directly to the ScrollViewer.
-    /// Buttons mark PointerWheelChanged as handled internally, so we must imperatively
-    /// drive ChangeView instead of relying on bubbling.
+    /// Forwards pointer wheel events from elements that consume them (Buttons, Expander headers)
+    /// directly to the outer ScrollViewer via ChangeView.
+    ///
+    /// Why not just set e.Handled = false and let it bubble?
+    ///   WinUI 3 Buttons mark PointerWheelChanged as Handled at the control level — resetting
+    ///   Handled to false in a handledEventsToo handler does not re-enable bubbling in WinRT.
+    ///
+    /// Why track _scrollTarget instead of reading VerticalOffset?
+    ///   ChangeView with animation is async; VerticalOffset doesn't update until the animation
+    ///   completes. Rapid wheel ticks would all compute the same target (from the stale offset),
+    ///   making the list barely move. Accumulating into _scrollTarget fixes this.
     /// </summary>
-    private void OnCardPointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    private void OnForwardScroll(object sender, PointerRoutedEventArgs e)
     {
         var delta = e.GetCurrentPoint(null).Properties.MouseWheelDelta;
-        // WheelDelta is positive = scroll up, negative = scroll down (opposite of offset direction)
-        var newOffset = HistoryScroller.VerticalOffset - delta;
-        HistoryScroller.ChangeView(null, newOffset, null, false);
+        // Fall back to current offset the first time (after a list rebuild)
+        if (double.IsNaN(_scrollTarget))
+            _scrollTarget = HistoryScroller.VerticalOffset;
+
+        _scrollTarget = Math.Max(0, Math.Min(_scrollTarget - delta, HistoryScroller.ScrollableHeight));
+        HistoryScroller.ChangeView(null, _scrollTarget, null, false); // false = keep smooth animation
         e.Handled = true;
     }
 
