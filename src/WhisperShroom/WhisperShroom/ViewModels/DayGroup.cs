@@ -1,3 +1,4 @@
+using WhisperShroom.Helpers;
 using WhisperShroom.Models;
 
 namespace WhisperShroom.ViewModels;
@@ -33,6 +34,8 @@ public sealed class DayGroup
         var totalSeconds = entries
             .Where(e => e.UsageType == "duration")
             .Sum(e => e.DurationSeconds ?? 0);
+        var totalCost = entries
+            .Sum(e => e.CostEur ?? 0m);
 
         var parts = new List<string> { $"{count} transcription{(count != 1 ? "s" : "")}" };
 
@@ -41,6 +44,9 @@ public sealed class DayGroup
 
         if (totalSeconds > 0)
             parts.Add($"{totalSeconds}s audio");
+
+        if (totalCost > 0)
+            parts.Add(CostCalculator.FormatCostEur(totalCost));
 
         return string.Join(" | ", parts);
     }

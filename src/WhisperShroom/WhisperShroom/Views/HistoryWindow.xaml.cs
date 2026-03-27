@@ -179,7 +179,7 @@ public sealed partial class HistoryWindow : Window
         Grid.SetRowSpan(buttonsPanel, 2);
         card.Children.Add(buttonsPanel);
 
-        // Meta row: time + usage + model
+        // Meta row: time + cost + usage + model
         var metaPanel = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -193,6 +193,17 @@ public sealed partial class HistoryWindow : Window
             FontSize = 12,
             Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
         });
+
+        if (!string.IsNullOrEmpty(entry.CostDisplay))
+        {
+            metaPanel.Children.Add(new TextBlock
+            {
+                Text = entry.CostDisplay,
+                FontSize = 12,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            });
+        }
 
         if (!string.IsNullOrEmpty(entry.UsageDisplay))
         {
@@ -230,9 +241,24 @@ public sealed partial class HistoryWindow : Window
         }
     }
 
-    private void OnDeleteEntry(object sender, RoutedEventArgs e)
+    private async void OnDeleteEntry(object sender, RoutedEventArgs e)
     {
-        if (sender is Button button && button.Tag is string id)
+        if (sender is not Button button || button.Tag is not string id)
+            return;
+
+        var dialog = new ContentDialog
+        {
+            Title = "Delete Transcription",
+            Content = "Are you sure you want to delete this transcription? This cannot be undone.",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+
+        if (result == ContentDialogResult.Primary)
         {
             _viewModel.DeleteEntry(id);
             BuildHistoryUI();

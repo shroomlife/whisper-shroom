@@ -1,3 +1,5 @@
+using WhisperShroom.Helpers;
+
 namespace WhisperShroom.Models;
 
 public sealed class TranscriptionEntry
@@ -23,4 +25,16 @@ public sealed class TranscriptionEntry
     };
 
     public int ComputedTotalTokens => (InputTokens ?? 0) + (OutputTokens ?? 0);
+
+    public decimal? CostEur => CostCalculator.CalculateCostEur(
+        Model, UsageType, InputTokens, OutputTokens, DurationSeconds);
+
+    public string CostDisplay
+    {
+        get
+        {
+            var cost = CostEur;
+            return cost is not null ? CostCalculator.FormatCostEur(cost.Value) : "";
+        }
+    }
 }
