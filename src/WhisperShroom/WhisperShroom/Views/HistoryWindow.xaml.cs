@@ -52,16 +52,15 @@ public sealed partial class HistoryWindow : Window
         catch { }
 
         CenterOnScreen();
-
-        // Single wheel-scroll forwarder on the ScrollViewer itself (handledEventsToo).
-        // Children that consume PointerWheelChanged (Buttons, Expander toggle buttons) set
-        // e.Handled = true, so the ScrollViewer's native handler never fires for them.
-        // We catch those here and call ChangeView. For un-handled events (TextBlock, StackPanel…)
-        // we return immediately so the ScrollViewer's built-in behaviour runs as normal.
-        HistoryScroller.AddHandler(UIElement.PointerWheelChangedEvent,
-            new PointerEventHandler(OnScrollerWheelForward), true);
-
         BuildHistoryUI();
+
+        // Attach AFTER BuildHistoryUI so HistoryPanel exists in the visual tree.
+        // Handler on HistoryPanel (not HistoryScroller) because WinUI 3 Expander content
+        // bubbling can fail to reach the ScrollViewer level reliably.
+        // handledEventsToo=true catches Buttons & Expander-header events that are
+        // already marked Handled; we then drive ChangeView ourselves.
+        HistoryPanel.AddHandler(UIElement.PointerWheelChangedEvent,
+            new PointerEventHandler(OnScrollerWheelForward), true);
 
         // React to new transcriptions or deletions from other windows
         App.HistoryService.Changed += OnHistoryChanged;
@@ -356,29 +355,24 @@ public sealed partial class HistoryWindow : Window
     }
 
     /// <summary>
-    /// Registered on HistoryScroller with handledEventsToo=true.
+    /// Registered on HistoryPanel (the StackPanel inside the ScrollViewer) with handledEventsToo=true.
     ///
-    /// Strategy: one handler at the ScrollViewer level instead of on individual children.
+    /// Catches ALL wheel events from children — whether or not they were already marked Handled
+    /// by a Button or Expander toggle button. Drives the parent HistoryScroller directly via
+    /// ChangeView so the ScrollViewer always scrolls regardless of which element the pointer is over.
     ///
-    /// • e.Handled == false → a non-consuming element (TextBlock, StackPanel, Border…) produced
-    ///   the event. The ScrollViewer's own built-in handler will fire for these — return early so
-    ///   we don't interfere and cause double-scrolling.
-    ///
-    /// • e.Handled == true  → a Button or Expander toggle-button consumed the event, so the
-    ///   ScrollViewer's native handler is suppressed. We call ChangeView manually.
-    ///   _scrollTarget accumulates deltas independently of VerticalOffset (which lags during
-    ///   animation) so rapid wheel ticks don't all collapse to the same target.
+    /// _scrollTarget accumulates deltas independently of VerticalOffset so rapid successive ticks
+    /// (before the animated scroll finishes) compute the correct next target.
     /// </summary>
     private void OnScrollerWheelForward(object sender, PointerRoutedEventArgs e)
     {
-        if (!e.Handled) return; // ScrollViewer handles unhandled events natively — don't double-scroll
-
         var delta = e.GetCurrentPoint(null).Properties.MouseWheelDelta;
         if (double.IsNaN(_scrollTarget))
             _scrollTarget = HistoryScroller.VerticalOffset;
 
         _scrollTarget = Math.Max(0, Math.Min(_scrollTarget - delta, HistoryScroller.ScrollableHeight));
         HistoryScroller.ChangeView(null, _scrollTarget, null, false);
+        e.Handled = true; // prevent the event reaching HistoryScroller's native handler (avoids double-scroll)
     }
 
     private void OnCopyEntry(object sender, RoutedEventArgs e)

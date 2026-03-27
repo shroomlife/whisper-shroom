@@ -58,22 +58,15 @@ internal static class CostCalculator
     }
 
     /// <summary>
-    /// Formats a cost value for display (e.g., "0.0003 EUR" or "&lt; 0.01 ct").
+    /// Formats a cost value for display in € (e.g., "0.0009 €", "0.0138 €", "1.23 €").
+    /// Always uses the € symbol, never cents.
     /// </summary>
     public static string FormatCostEur(decimal costEur)
     {
-        // Show in cents if less than 1 EUR
-        var cents = costEur * 100;
+        if (costEur < 0.00005m)
+            return "< 0.0001 €";
 
-        if (cents < 0.01m)
-            return "< 0.01 ct";
-
-        if (cents < 1m)
-            return $"{cents:F2} ct";
-
-        if (costEur < 1m)
-            return $"{costEur:F4} €";
-
-        return $"{costEur:F2} €";
+        // Show 4 decimal places for small amounts, 2 for amounts ≥ 1 €
+        return costEur >= 1m ? $"{costEur:F2} €" : $"{costEur:F4} €";
     }
 }
