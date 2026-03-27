@@ -72,42 +72,79 @@ public sealed partial class HistoryWindow : Window
         EmptyState.Visibility = Visibility.Collapsed;
         HistoryScroller.Visibility = Visibility.Visible;
 
-        foreach (var dayGroup in _viewModel.DayGroups)
+        foreach (var monthGroup in _viewModel.MonthGroups)
         {
-            var expander = new Expander
+            // Month level: subtle header, expanded for current month
+            var monthExpander = new Expander
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                IsExpanded = dayGroup.Date == DateTime.Today,
-                Margin = new Thickness(0, 0, 0, 4)
+                IsExpanded = monthGroup.IsCurrentMonth,
+                Margin = new Thickness(0, 0, 0, 8)
             };
 
-            // Header with date and summary
-            var headerPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-            headerPanel.Children.Add(new TextBlock
+            // Month header
+            var monthHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+            monthHeader.Children.Add(new TextBlock
             {
-                Text = dayGroup.DateLabel,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Text = monthGroup.MonthLabel,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                FontSize = 15,
                 VerticalAlignment = VerticalAlignment.Center
             });
-            headerPanel.Children.Add(new TextBlock
+            monthHeader.Children.Add(new TextBlock
             {
-                Text = dayGroup.DaySummary,
-                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                Text = monthGroup.MonthSummary,
+                Foreground = (Brush)Application.Current.Resources["TextFillColorTertiaryBrush"],
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 12
             });
-            expander.Header = headerPanel;
+            monthExpander.Header = monthHeader;
 
-            // Content: list of entries
-            var entriesPanel = new StackPanel { Spacing = 6 };
-            foreach (var entry in dayGroup.Entries)
+            // Days inside the month
+            var daysPanel = new StackPanel { Spacing = 4 };
+
+            foreach (var dayGroup in monthGroup.Days)
             {
-                entriesPanel.Children.Add(CreateEntryCard(entry));
-            }
-            expander.Content = entriesPanel;
+                var dayExpander = new Expander
+                {
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                    IsExpanded = dayGroup.Date == DateTime.Today,
+                    Margin = new Thickness(0, 0, 0, 2),
+                    Padding = new Thickness(0)
+                };
 
-            HistoryPanel.Children.Add(expander);
+                // Day header
+                var dayHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+                dayHeader.Children.Add(new TextBlock
+                {
+                    Text = dayGroup.DateLabel,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                dayHeader.Children.Add(new TextBlock
+                {
+                    Text = dayGroup.DaySummary,
+                    Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontSize = 12
+                });
+                dayExpander.Header = dayHeader;
+
+                // Entries inside the day
+                var entriesPanel = new StackPanel { Spacing = 6 };
+                foreach (var entry in dayGroup.Entries)
+                {
+                    entriesPanel.Children.Add(CreateEntryCard(entry));
+                }
+                dayExpander.Content = entriesPanel;
+
+                daysPanel.Children.Add(dayExpander);
+            }
+
+            monthExpander.Content = daysPanel;
+            HistoryPanel.Children.Add(monthExpander);
         }
     }
 

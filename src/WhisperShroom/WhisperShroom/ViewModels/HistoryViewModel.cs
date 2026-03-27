@@ -5,7 +5,7 @@ namespace WhisperShroom.ViewModels;
 
 public partial class HistoryViewModel : ObservableObject
 {
-    public ObservableCollection<DayGroup> DayGroups { get; } = new();
+    public ObservableCollection<MonthGroup> MonthGroups { get; } = new();
 
     [ObservableProperty]
     public partial bool IsEmpty { get; set; }
@@ -17,19 +17,28 @@ public partial class HistoryViewModel : ObservableObject
 
     public void LoadHistory()
     {
-        DayGroups.Clear();
+        MonthGroups.Clear();
 
         var entries = App.HistoryService.GetAllEntries();
-        var groups = entries
-            .GroupBy(e => e.Timestamp.LocalDateTime.Date)
-            .OrderByDescending(g => g.Key);
 
-        foreach (var group in groups)
+        // Group by month, then by day within each month
+        var months = entries
+            .GroupBy(e => new { e.Timestamp.LocalDateTime.Year, e.Timestamp.LocalDateTime.Month })
+            .OrderByDescending(g => g.Key.Year)
+            .ThenByDescending(g => g.Key.Month);
+
+        foreach (var monthGroup in months)
         {
-            DayGroups.Add(new DayGroup(group.Key, group.ToList()));
+            var dayGroups = monthGroup
+                .GroupBy(e => e.Timestamp.LocalDateTime.Date)
+                .OrderByDescending(g => g.Key)
+                .Select(g => new DayGroup(g.Key, g.ToList()))
+                .ToList();
+
+            MonthGroups.Add(new MonthGroup(monthGroup.Key.Year, monthGroup.Key.Month, dayGroups));
         }
 
-        IsEmpty = DayGroups.Count == 0;
+        IsEmpty = MonthGroups.Count == 0;
     }
 
     public void DeleteEntry(string id)
