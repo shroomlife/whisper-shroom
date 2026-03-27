@@ -155,7 +155,7 @@ public sealed partial class HistoryWindow : Window
                 dayExpander.Header = dayHeader;
 
                 // Entries inside the day
-                var entriesPanel = new StackPanel { Spacing = 6 };
+                var entriesPanel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 0) };
                 foreach (var entry in dayGroup.Entries)
                 {
                     entriesPanel.Children.Add(CreateEntryCard(entry));
@@ -174,8 +174,8 @@ public sealed partial class HistoryWindow : Window
                             new TextBlock { Text = "Delete this day" }
                         }
                     },
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    Margin = new Thickness(0, 8, 0, 0),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 10, 0, 4),
                     Padding = new Thickness(12, 6, 12, 6),
                     Tag = dayGroup.Date
                 };
@@ -357,13 +357,17 @@ public sealed partial class HistoryWindow : Window
     }
 
     /// <summary>
-    /// Forwards pointer wheel events from card elements to the outer ScrollViewer
-    /// so scrolling works consistently regardless of what the pointer hovers over.
+    /// Forwards pointer wheel events from card elements directly to the ScrollViewer.
+    /// Buttons mark PointerWheelChanged as handled internally, so we must imperatively
+    /// drive ChangeView instead of relying on bubbling.
     /// </summary>
     private void OnCardPointerWheelChanged(object sender, PointerRoutedEventArgs e)
     {
-        // Mark as not handled so the event bubbles up to the ScrollViewer
-        e.Handled = false;
+        var delta = e.GetCurrentPoint(null).Properties.MouseWheelDelta;
+        // WheelDelta is positive = scroll up, negative = scroll down (opposite of offset direction)
+        var newOffset = HistoryScroller.VerticalOffset - delta;
+        HistoryScroller.ChangeView(null, newOffset, null, false);
+        e.Handled = true;
     }
 
     private void OnCopyEntry(object sender, RoutedEventArgs e)

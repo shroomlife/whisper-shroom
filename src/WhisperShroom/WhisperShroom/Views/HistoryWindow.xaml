@@ -30,11 +30,9 @@
                        HorizontalAlignment="Center" />
         </StackPanel>
 
-        <!-- History list -->
-        <ScrollViewer Grid.Row="1" x:Name="HistoryScroller">
-            <StackPanel x:Name="HistoryPanel" Spacing="8">
-                <!-- Day entries + "Clear All" button are added in code-behind -->
-            </StackPanel>
+        <!-- History list — Padding right keeps content clear of the scrollbar -->
+        <ScrollViewer Grid.Row="1" x:Name="HistoryScroller" Padding="0,0,16,0">
+            <StackPanel x:Name="HistoryPanel" Spacing="8" />
         </ScrollViewer>
     </Grid>
 </Window>
