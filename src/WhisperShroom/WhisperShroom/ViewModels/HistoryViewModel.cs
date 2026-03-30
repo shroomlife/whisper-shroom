@@ -13,9 +13,31 @@ public partial class HistoryViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsEmpty { get; set; }
 
+    [ObservableProperty]
+    public partial string SearchQuery { get; set; } = "";
+
     public HistoryViewModel()
     {
         LoadHistory();
+    }
+
+    public bool HasSearchQuery => !string.IsNullOrWhiteSpace(SearchQuery);
+
+    /// <summary>
+    /// Returns entries matching the current search query (case-insensitive).
+    /// </summary>
+    public (List<TranscriptionEntry> Results, int TotalCount) SearchEntries()
+    {
+        if (!HasSearchQuery) return ([], 0);
+
+        var query = SearchQuery.Trim();
+        var all = App.HistoryService.GetAllEntries()
+            .Where(e => !e.IsPending && e.Text.Contains(query, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        // Cap displayed results to keep UI responsive (Inlines disable TextBlock fast-path)
+        const int maxResults = 100;
+        return (all.Take(maxResults).ToList(), all.Count);
     }
 
     public void LoadHistory()

@@ -8,15 +8,22 @@
     <Grid x:Name="RootGrid" Padding="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <TextBlock Text="Transcription History"
                    Style="{StaticResource TitleTextBlockStyle}"
-                   Margin="0,0,0,16" />
+                   Margin="0,0,0,12" />
+
+        <AutoSuggestBox x:Name="SearchBox"
+                        Grid.Row="1"
+                        PlaceholderText="Search transcriptions..."
+                        QueryIcon="Find"
+                        Margin="0,0,16,16" />
 
         <!-- Empty state -->
-        <StackPanel Grid.Row="1"
+        <StackPanel Grid.Row="2"
                     x:Name="EmptyState"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center"
@@ -31,7 +38,7 @@
         </StackPanel>
 
         <!-- History list -->
-        <ScrollViewer Grid.Row="1" x:Name="HistoryScroller" Padding="0,0,16,0">
+        <ScrollViewer Grid.Row="2" x:Name="HistoryScroller" Padding="0,0,16,0">
             <StackPanel x:Name="HistoryPanel" Spacing="8" />
         </ScrollViewer>
     </Grid>

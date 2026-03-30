@@ -3,6 +3,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using WinRT.Interop;
@@ -17,6 +18,7 @@ public sealed partial class HistoryWindow : Window
     private readonly AppWindow _appWindow;
     private readonly HistoryViewModel _viewModel = new();
     private readonly DispatcherQueue _dispatcher;
+    private DispatcherQueueTimer? _searchDebounceTimer;
 
 
     public HistoryWindow()
@@ -59,6 +61,8 @@ public sealed partial class HistoryWindow : Window
 
         BuildHistoryUI();
 
+        SearchBox.TextChanged += OnSearchTextChanged;
+
         // Ensure scroll events from child elements (Buttons, Expander toggle-buttons) reach
         // the ScrollViewer as unhandled. Some WinUI 3 controls mark PointerWheelChanged as
         // Handled internally, which prevents the parent ScrollViewer from scrolling.
@@ -78,8 +82,34 @@ public sealed partial class HistoryWindow : Window
         _dispatcher.TryEnqueue(() =>
         {
             _viewModel.LoadHistory();
-            BuildHistoryUI();
+            RebuildUI();
         });
+    }
+
+    private void OnSearchTextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+    {
+        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
+            return;
+
+        // Debounce: wait 250ms after last keystroke before filtering
+        _searchDebounceTimer?.Stop();
+        _searchDebounceTimer ??= _dispatcher.CreateTimer();
+        _searchDebounceTimer.Interval = TimeSpan.FromMilliseconds(250);
+        _searchDebounceTimer.IsRepeating = false;
+        _searchDebounceTimer.Tick += (_, _) =>
+        {
+            _viewModel.SearchQuery = sender.Text;
+            RebuildUI();
+        };
+        _searchDebounceTimer.Start();
+    }
+
+    private void RebuildUI()
+    {
+        if (_viewModel.HasSearchQuery)
+            BuildSearchResultsUI();
+        else
+            BuildHistoryUI();
     }
 
     private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
@@ -477,6 +507,193 @@ public sealed partial class HistoryWindow : Window
         return border;
     }
 
+    private void BuildSearchResultsUI()
+    {
+        HistoryPanel.Children.Clear();
+
+        var (results, totalCount) = _viewModel.SearchEntries();
+
+        if (totalCount == 0)
+        {
+            EmptyState.Visibility = Visibility.Collapsed;
+            HistoryScroller.Visibility = Visibility.Visible;
+
+            var noResults = new TextBlock
+            {
+                Text = "No matching transcriptions found.",
+                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 32, 0, 0)
+            };
+            HistoryPanel.Children.Add(noResults);
+            return;
+        }
+
+        EmptyState.Visibility = Visibility.Collapsed;
+        HistoryScroller.Visibility = Visibility.Visible;
+
+        var countText = totalCount > results.Count
+            ? $"Showing {results.Count} of {totalCount} results"
+            : $"{totalCount} result{(totalCount != 1 ? "s" : "")}";
+
+        var countLabel = new TextBlock
+        {
+            Text = countText,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        HistoryPanel.Children.Add(countLabel);
+
+        foreach (var entry in results)
+        {
+            HistoryPanel.Children.Add(CreateSearchResultCard(entry, _viewModel.SearchQuery.Trim()));
+        }
+    }
+
+    private UIElement CreateSearchResultCard(TranscriptionEntry entry, string query)
+    {
+        var border = new Border
+        {
+            Padding = new Thickness(12),
+            CornerRadius = new CornerRadius(6),
+            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(0, 0, 0, 6),
+            ManipulationMode = ManipulationModes.System
+        };
+
+        var card = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) },
+                new ColumnDefinition { Width = GridLength.Auto }
+            },
+            RowDefinitions =
+            {
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto }
+            }
+        };
+
+        // Highlighted text
+        var textBlock = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            MaxLines = 5,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        AddHighlightedText(textBlock, entry.Text, query);
+        Grid.SetColumn(textBlock, 0);
+        Grid.SetRow(textBlock, 0);
+        card.Children.Add(textBlock);
+
+        // Action buttons
+        var buttonsPanel = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Spacing = 4,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+
+        var copyButton = new Button
+        {
+            Content = new FontIcon { Glyph = "\uE8C8", FontSize = 14 },
+            Padding = new Thickness(8, 6, 8, 6),
+            Tag = entry.Text
+        };
+        ToolTipService.SetToolTip(copyButton, "Copy");
+        copyButton.Click += OnCopyEntry;
+        buttonsPanel.Children.Add(copyButton);
+
+        var deleteButton = new Button
+        {
+            Content = new FontIcon { Glyph = "\uE74D", FontSize = 14 },
+            Padding = new Thickness(8, 6, 8, 6),
+            Tag = entry.Id
+        };
+        ToolTipService.SetToolTip(deleteButton, "Delete");
+        deleteButton.Click += OnDeleteEntry;
+        buttonsPanel.Children.Add(deleteButton);
+
+        Grid.SetColumn(buttonsPanel, 1);
+        Grid.SetRow(buttonsPanel, 0);
+        Grid.SetRowSpan(buttonsPanel, 2);
+        card.Children.Add(buttonsPanel);
+
+        // Meta row: date + time + model
+        var metaPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+            Margin = new Thickness(0, 6, 0, 0)
+        };
+
+        metaPanel.Children.Add(new TextBlock
+        {
+            Text = entry.Timestamp.LocalDateTime.ToString("d MMM yyyy, HH:mm"),
+            FontSize = 12,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+        });
+
+        if (!string.IsNullOrEmpty(entry.Model))
+        {
+            metaPanel.Children.Add(new TextBlock
+            {
+                Text = entry.Model,
+                FontSize = 12,
+                Foreground = (Brush)Application.Current.Resources["TextFillColorTertiaryBrush"]
+            });
+        }
+
+        Grid.SetColumn(metaPanel, 0);
+        Grid.SetRow(metaPanel, 1);
+        card.Children.Add(metaPanel);
+
+        border.Child = card;
+        return border;
+    }
+
+    private static void AddHighlightedText(TextBlock textBlock, string text, string query)
+    {
+        textBlock.Inlines.Clear();
+
+        var highlightBrush = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+
+        var index = 0;
+        while (index < text.Length)
+        {
+            var matchIndex = text.IndexOf(query, index, StringComparison.OrdinalIgnoreCase);
+            if (matchIndex < 0)
+            {
+                // Remaining text after last match
+                textBlock.Inlines.Add(new Run { Text = text[index..] });
+                break;
+            }
+
+            // Text before the match
+            if (matchIndex > index)
+            {
+                textBlock.Inlines.Add(new Run { Text = text[index..matchIndex] });
+            }
+
+            // The highlighted match
+            var matchedText = text.Substring(matchIndex, query.Length);
+            textBlock.Inlines.Add(new Run
+            {
+                Text = matchedText,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                Foreground = highlightBrush
+            });
+
+            index = matchIndex + query.Length;
+        }
+    }
+
     private async void OnRetryEntry(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || button.Tag is not TranscriptionEntry entry)
@@ -493,7 +710,7 @@ public sealed partial class HistoryWindow : Window
             ToolTipService.SetToolTip(button, "Retry transcription");
         }
 
-        BuildHistoryUI();
+        RebuildUI();
     }
 
     private void OnCopyEntry(object sender, RoutedEventArgs e)
@@ -525,7 +742,7 @@ public sealed partial class HistoryWindow : Window
         if (result == ContentDialogResult.Primary)
         {
             _viewModel.DeleteEntry(id);
-            BuildHistoryUI();
+            RebuildUI();
         }
     }
 
@@ -553,7 +770,7 @@ public sealed partial class HistoryWindow : Window
         if (result == ContentDialogResult.Primary)
         {
             _viewModel.DeleteDay(date);
-            BuildHistoryUI();
+            RebuildUI();
         }
     }
 
@@ -574,7 +791,7 @@ public sealed partial class HistoryWindow : Window
         if (result == ContentDialogResult.Primary)
         {
             _viewModel.DeleteAll();
-            BuildHistoryUI();
+            RebuildUI();
         }
     }
 }
