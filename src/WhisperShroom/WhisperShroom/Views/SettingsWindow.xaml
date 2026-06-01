@@ -10,6 +10,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock Text="WhisperShroom - Settings"
@@ -109,5 +110,12 @@
                     Padding="0,10"
                     Click="OnCancel" />
         </Grid>
+
+        <TextBlock Grid.Row="3"
+                   Text="{x:Bind ViewModel.AppVersionDisplay}"
+                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                   FontSize="12"
+                   HorizontalAlignment="Center"
+                   Margin="0,12,0,0" />
     </Grid>
 </Window>

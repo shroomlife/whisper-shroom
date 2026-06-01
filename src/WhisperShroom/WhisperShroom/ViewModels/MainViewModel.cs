@@ -15,6 +15,13 @@ public partial class MainViewModel : ObservableObject
     private DispatcherQueueTimer? _timer;
     private bool _silenceWarned;
 
+    // Tracks the currently persisted (pending) recording so the Retry command can
+    // re-transcribe the exact same audio. Cleared on success / new recording.
+    private string? _pendingEntryId;
+    private string? _pendingAudioPath;
+    private string? _pendingModel;
+    private string? _pendingLanguage;
+
     [ObservableProperty]
     public partial AppState CurrentState { get; set; }
 
@@ -128,6 +135,9 @@ public partial class MainViewModel : ObservableObject
         StopTimer();
         var wavData = App.AudioService.StopRecording();
 
+        // _hasAudio is only reset on the next StartRecording, so it's still valid here.
+        var hadAudio = App.AudioService.HasAudio;
+
         if (wavData is null || wavData.Length == 0)
         {
             CurrentState = AppState.Ready;
@@ -137,41 +147,82 @@ public partial class MainViewModel : ObservableObject
         CurrentState = AppState.Loading;
 
         var config = App.ConfigService.Config;
-        var apiKey = config.ApiKey;
         var language = config.Language;
         var model = config.Model ?? TranscriptionModelHelper.DefaultModelId;
 
+        // Persist the recording up front (crash-safe). Wrapped in try/catch because the
+        // async RelayCommand default is "await and rethrow" — an escaping IO exception
+        // (e.g. disk full) would otherwise crash the app.
+        try
+        {
+            var audioPath = SaveAudioFile(wavData);
+            _pendingEntryId = App.HistoryService.AddPendingEntry(audioPath, model, language, "");
+            _pendingAudioPath = audioPath;
+            _pendingModel = model;
+            _pendingLanguage = language;
+        }
+        catch (Exception ex)
+        {
+            _pendingEntryId = null;
+            _pendingAudioPath = null;
+            ShowSettingsOnError = false;
+            ErrorMessage = $"Could not save recording: {ex.Message}";
+            CurrentState = AppState.Error;
+            return;
+        }
+
+        // Skip the (billed) API call for truly silent recordings, but keep them persisted
+        // so the user can still force a retry from the error panel or History.
+        if (!hadAudio)
+        {
+            App.HistoryService.UpdatePendingError(_pendingEntryId!, TranscriptionWorkflow.NoSpeechMessage);
+            ShowSettingsOnError = false;
+            ErrorMessage = TranscriptionWorkflow.NoSpeechMessage;
+            CurrentState = AppState.Error;
+            return;
+        }
+
+        await TranscribeCurrentPendingAsync();
+    }
+
+    /// <summary>
+    /// Transcribes the currently persisted pending recording and drives the UI state.
+    /// Shared by the initial stop flow and the Retry command.
+    /// </summary>
+    private async Task TranscribeCurrentPendingAsync()
+    {
+        if (_pendingEntryId is null || _pendingAudioPath is null) return;
+
+        CurrentState = AppState.Loading;
+
+        var config = App.ConfigService.Config;
+        var apiKey = config.ApiKey;
+
         if (string.IsNullOrWhiteSpace(apiKey))
         {
+            App.HistoryService.UpdatePendingError(
+                _pendingEntryId, "No API key configured. Please add your OpenAI API key in Settings.");
             ShowSettingsOnError = true;
             ErrorMessage = "No API key configured. Please add your OpenAI API key in Settings.";
             CurrentState = AppState.Error;
             return;
         }
 
-        try
+        var model = _pendingModel ?? config.Model ?? TranscriptionModelHelper.DefaultModelId;
+        var outcome = await TranscriptionWorkflow.RunPendingAsync(
+            _pendingEntryId, _pendingAudioPath, apiKey, _pendingLanguage, model);
+
+        if (outcome.Kind == TranscriptionWorkflow.OutcomeKind.Success && outcome.Result is not null)
         {
-            var result = await Task.Run(() =>
-                App.TranscriptionService.TranscribeAsync(wavData, apiKey, language, model));
-
-            var trimmed = result.Text.Trim();
-
-            if (HallucinationFilter.IsHallucination(trimmed))
-            {
-                ErrorMessage = "No audio detected. Please check your microphone in Settings.";
-                CurrentState = AppState.Error;
-                return;
-            }
-
-            ResultText = trimmed;
-
-            var entryResult = result with { Text = trimmed };
-            App.HistoryService.AddEntry(entryResult, model, language);
+            ResultText = outcome.Result.Text;
             HasPrefix = !string.IsNullOrEmpty(config.PromptPrefix);
             HasSuffix = !string.IsNullOrEmpty(config.PromptSuffix);
             IncludePrefix = true;
             IncludeSuffix = true;
+            ShowSettingsOnError = false;
             CurrentState = AppState.Result;
+
+            ClearPending();
 
             if (config.AutoCopyEnabled)
             {
@@ -181,19 +232,39 @@ public partial class MainViewModel : ObservableObject
 
             if (config.NotificationsEnabled)
             {
-                App.NotificationService.ShowTranscriptionResult(trimmed);
+                App.NotificationService.ShowTranscriptionResult(outcome.Result.Text);
             }
-        }
-        catch (Exception ex)
-        {
-            // Save audio persistently so the user can retry from History
-            var audioPath = SaveAudioFile(wavData);
-            App.HistoryService.AddPendingEntry(audioPath, model, language, ex.Message);
 
-            ShowSettingsOnError = ex.Message.Contains("API key", StringComparison.OrdinalIgnoreCase);
-            ErrorMessage = ex.Message;
-            CurrentState = AppState.Error;
+            return;
         }
+
+        // Hallucination or failure: keep _pending* so the Retry command can try again.
+        var message = outcome.ErrorMessage ?? "Transcription failed.";
+        ShowSettingsOnError = message.Contains("API key", StringComparison.OrdinalIgnoreCase);
+        ErrorMessage = message;
+        CurrentState = AppState.Error;
+    }
+
+    [RelayCommand]
+    private async Task RetryAsync()
+    {
+        if (_pendingEntryId is null || _pendingAudioPath is null)
+        {
+            // Nothing persisted to retry — fall back to a fresh state.
+            ShowSettingsOnError = false;
+            CurrentState = AppState.Ready;
+            return;
+        }
+
+        await TranscribeCurrentPendingAsync();
+    }
+
+    private void ClearPending()
+    {
+        _pendingEntryId = null;
+        _pendingAudioPath = null;
+        _pendingModel = null;
+        _pendingLanguage = null;
     }
 
     private static string SaveAudioFile(byte[] wavData)
@@ -220,6 +291,7 @@ public partial class MainViewModel : ObservableObject
     private void NewRecording()
     {
         ShowSettingsOnError = false;
+        ClearPending();
         CurrentState = AppState.Ready;
     }
 

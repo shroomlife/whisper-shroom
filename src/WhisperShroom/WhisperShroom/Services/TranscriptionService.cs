@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using NAudio.Wave;
 using WhisperShroom.Helpers;
 using WhisperShroom.Models;
 
@@ -7,7 +8,17 @@ namespace WhisperShroom.Services;
 
 public sealed class TranscriptionService : IDisposable
 {
-    private readonly HttpClient _http = new();
+    // OpenAI's audio endpoint rejects uploads over 25 MB. Stay safely under it (decimal
+    // and binary interpretations both covered) and split larger recordings purely by
+    // file size — never by duration.
+    private const long MaxUploadBytes = 24_000_000;
+
+    private readonly HttpClient _http = new()
+    {
+        // Large recordings (multi-MB upload + Whisper processing) easily exceed the 100 s
+        // HttpClient default, which would surface as a spurious timeout failure.
+        Timeout = TimeSpan.FromMinutes(5)
+    };
 
     /// <summary>
     /// Validates the API key by calling GET /v1/models and checking for any known transcription model.
@@ -88,9 +99,41 @@ public sealed class TranscriptionService : IDisposable
 
     public async Task<TranscriptionResult> TranscribeAsync(byte[] wavData, string apiKey, string? language = null, string? model = null, CancellationToken ct = default)
     {
-        using var content = new MultipartFormDataContent();
-
         var effectiveModel = model ?? TranscriptionModelHelper.DefaultModelId;
+
+        // Small enough to upload in a single request.
+        if (wavData.Length <= MaxUploadBytes)
+            return await TranscribeChunkAsync(wavData, apiKey, language, effectiveModel, ct);
+
+        // Too large for one upload — split into <=MaxUploadBytes WAV chunks (by file size),
+        // transcribe each sequentially, then stitch the text and sum the usage.
+        var chunks = SplitWav(wavData, MaxUploadBytes);
+        if (chunks.Count <= 1)
+            return await TranscribeChunkAsync(wavData, apiKey, language, effectiveModel, ct);
+
+        var texts = new List<string>(chunks.Count);
+        TranscriptionResult? aggregate = null;
+
+        foreach (var chunk in chunks)
+        {
+            ct.ThrowIfCancellationRequested();
+            var part = await TranscribeChunkAsync(chunk, apiKey, language, effectiveModel, ct);
+
+            var partText = part.Text.Trim();
+            if (partText.Length > 0)
+                texts.Add(partText);
+
+            aggregate = MergeUsage(aggregate, part);
+        }
+
+        var combined = string.Join(" ", texts);
+        return (aggregate ?? new TranscriptionResult { Text = combined }) with { Text = combined };
+    }
+
+    /// <summary>Uploads a single WAV payload (already known to be within the size limit).</summary>
+    private async Task<TranscriptionResult> TranscribeChunkAsync(byte[] wavData, string apiKey, string? language, string effectiveModel, CancellationToken ct)
+    {
+        using var content = new MultipartFormDataContent();
 
         var fileContent = new ByteArrayContent(wavData);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
@@ -168,6 +211,75 @@ public sealed class TranscriptionService : IDisposable
 
         return result;
     }
+
+    /// <summary>
+    /// Splits a PCM WAV byte array into chunks whose individual WAV file size stays at or
+    /// below <paramref name="maxBytes"/>. Purely size-based and sample-frame aligned so a
+    /// sample is never cut in half; duration is irrelevant.
+    /// </summary>
+    private static List<byte[]> SplitWav(byte[] wavData, long maxBytes)
+    {
+        using var reader = new WaveFileReader(new MemoryStream(wavData));
+        var format = reader.WaveFormat;
+
+        const int headerBytes = 44; // canonical PCM WAV header written by WaveFileWriter
+        var blockAlign = Math.Max(format.BlockAlign, 1);
+
+        var maxDataPerChunk = maxBytes - headerBytes;
+        maxDataPerChunk -= maxDataPerChunk % blockAlign; // align down to a whole sample frame
+        if (maxDataPerChunk <= 0)
+            return [];
+
+        var chunks = new List<byte[]>();
+        var buffer = new byte[maxDataPerChunk];
+
+        int read;
+        while ((read = ReadFull(reader, buffer)) > 0)
+            chunks.Add(BuildWav(format, buffer, read));
+
+        return chunks;
+    }
+
+    /// <summary>Wraps raw PCM bytes in a fresh WAV container.</summary>
+    private static byte[] BuildWav(WaveFormat format, byte[] data, int count)
+    {
+        using var ms = new MemoryStream();
+        using (var writer = new WaveFileWriter(ms, format))
+            writer.Write(data, 0, count);
+        // MemoryStream.ToArray() is documented to work after the stream has been closed,
+        // and WaveFileWriter.Dispose finalizes the RIFF/data sizes before closing it.
+        return ms.ToArray();
+    }
+
+    private static int ReadFull(WaveStream reader, byte[] buffer)
+    {
+        var total = 0;
+        int read;
+        while (total < buffer.Length &&
+               (read = reader.Read(buffer, total, buffer.Length - total)) > 0)
+            total += read;
+        return total;
+    }
+
+    /// <summary>Sums usage/cost fields across transcribed chunks.</summary>
+    private static TranscriptionResult MergeUsage(TranscriptionResult? acc, TranscriptionResult part)
+    {
+        if (acc is null)
+            return part;
+
+        return acc with
+        {
+            UsageType = acc.UsageType ?? part.UsageType,
+            InputTokens = AddNullable(acc.InputTokens, part.InputTokens),
+            OutputTokens = AddNullable(acc.OutputTokens, part.OutputTokens),
+            TotalTokens = AddNullable(acc.TotalTokens, part.TotalTokens),
+            AudioTokens = AddNullable(acc.AudioTokens, part.AudioTokens),
+            DurationSeconds = AddNullable(acc.DurationSeconds, part.DurationSeconds),
+        };
+    }
+
+    private static int? AddNullable(int? a, int? b) =>
+        a is null && b is null ? null : (a ?? 0) + (b ?? 0);
 
     public void Dispose()
     {

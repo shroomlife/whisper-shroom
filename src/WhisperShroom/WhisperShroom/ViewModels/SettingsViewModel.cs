@@ -48,6 +48,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial string SuffixPreview { get; set; }
 
+    /// <summary>Installed app version, shown in the settings footer.</summary>
+    public string AppVersionDisplay => $"Version {AppInfo.Version}";
+
     public SettingsViewModel()
     {
         var config = App.ConfigService.Config;

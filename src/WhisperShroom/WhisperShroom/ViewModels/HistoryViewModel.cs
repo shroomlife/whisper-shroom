@@ -82,32 +82,11 @@ public partial class HistoryViewModel : ObservableObject
 
         var language = entry.Language ?? config.Language;
 
-        try
-        {
-            var wavData = await File.ReadAllBytesAsync(entry.AudioPath);
-            var result = await Task.Run(() =>
-                App.TranscriptionService.TranscribeAsync(wavData, apiKey, language, model));
+        var outcome = await TranscriptionWorkflow.RunPendingAsync(
+            entry.Id, entry.AudioPath, apiKey, language, model);
 
-            var trimmed = result.Text.Trim();
-
-            if (HallucinationFilter.IsHallucination(trimmed))
-                return false;
-
-            var completedResult = result with { Text = trimmed };
-            App.HistoryService.CompletePendingEntry(entry.Id, completedResult);
-
-            // Delete audio file after successful transcription
-            try { File.Delete(entry.AudioPath); } catch { }
-
-            LoadHistory();
-            return true;
-        }
-        catch (Exception ex)
-        {
-            App.HistoryService.UpdatePendingError(entry.Id, ex.Message);
-            LoadHistory();
-            return false;
-        }
+        LoadHistory();
+        return outcome.Kind == TranscriptionWorkflow.OutcomeKind.Success;
     }
 
     public void DeleteEntry(string id)

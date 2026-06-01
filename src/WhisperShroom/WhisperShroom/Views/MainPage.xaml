@@ -157,7 +157,7 @@
                             Padding="24,10" />
                     <Button Content="Retry"
                             Style="{StaticResource AccentButtonStyle}"
-                            Command="{x:Bind ViewModel.NewRecordingCommand}"
+                            Command="{x:Bind ViewModel.RetryCommand}"
                             Padding="24,10" />
                 </StackPanel>
             </StackPanel>
