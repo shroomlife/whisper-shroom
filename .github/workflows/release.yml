@@ -27,13 +27,6 @@ jobs:
           dotnet-version: "10.0.x"
           dotnet-quality: "preview"
 
-      - name: Extract version from tag
-        id: version
-        shell: bash
-        run: |
-          TAG="${GITHUB_REF#refs/tags/v}"
-          echo "tag_version=$TAG" >> "$GITHUB_OUTPUT"
-
       - name: Import signing certificate
         id: cert_import
         shell: pwsh
@@ -127,31 +120,55 @@ jobs:
           path: artifacts/
         continue-on-error: true
 
+      # The certificate filename is read from the downloaded artifact instead of being
+      # rebuilt from the tag. Constructing it meant hardcoding a trailing ".0" to pad
+      # 3-part tags (v1.8.0) up to the 4-part MSIX version, which then produced a
+      # bogus 5-part name once tags became 4-part (v1.9.0.0 -> 1.9.0.0.0). The artifact
+      # is the single source of truth, so the two can no longer drift apart.
+      - name: Compose release notes
+        run: |
+          CER_NAME=$(find artifacts -maxdepth 1 -name '*.cer' -printf '%f\n' | head -1)
+
+          cat > release-body.md <<'EOF'
+          ## Installation
+
+          ### Microsoft Store (recommended)
+          Search for **WhisperShroom** in the Microsoft Store or visit the [Store page](https://apps.microsoft.com/detail/9MX4RZGVCZMJ).
+
+          ### Sideload (manual)
+          EOF
+
+          if [ -n "$CER_NAME" ]; then
+            cat >> release-body.md <<'EOF'
+
+          **Step 1: Install the certificate (one-time setup)**
+
+          Download `__CER_NAME__` and run this command in an **Admin PowerShell**:
+
+          ```powershell
+          Import-Certificate -FilePath "$HOME\Downloads\__CER_NAME__" -CertStoreLocation "Cert:\LocalMachine\TrustedPeople"
+          ```
+
+          **Step 2: Install the app**
+          EOF
+            sed -i "s|__CER_NAME__|${CER_NAME}|g" release-body.md
+          fi
+
+          cat >> release-body.md <<'EOF'
+
+          Download the `.msix` file and double-click to install.
+
+          > **Note:** The certificate only needs to be installed once. Future updates can be installed by just downloading the new `.msix`.
+          EOF
+
+          echo "--- composed release body ---"
+          cat release-body.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: WhisperShroom v${{ steps.version.outputs.tag_version }}
           generate_release_notes: true
-          body: |
-            ## Installation
-
-            ### Microsoft Store (recommended)
-            Search for **WhisperShroom** in the Microsoft Store or visit the [Store page](https://apps.microsoft.com/detail/9MX4RZGVCZMJ).
-
-            ### Sideload (manual)
-
-            **Step 1: Install the certificate (one-time setup)**
-
-            Download the `.cer` file and run this command in an **Admin PowerShell**:
-
-            ```powershell
-            Import-Certificate -FilePath "$HOME\Downloads\WhisperShroom_${{ steps.version.outputs.tag_version }}.0_x64.cer" -CertStoreLocation "Cert:\LocalMachine\TrustedPeople"
-            ```
-
-            **Step 2: Install the app**
-
-            Download the `.msix` file and double-click to install.
-
-            > **Note:** The certificate only needs to be installed once. Future updates can be installed by just downloading the new `.msix`.
+          body_path: release-body.md
           files: |
             artifacts/*
