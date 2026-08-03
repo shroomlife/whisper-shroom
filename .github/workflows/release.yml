@@ -21,11 +21,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      # The SDK is pinned in global.json so CI and local builds use the exact same
+      # toolchain. Previously this was dotnet-version "10.0.x" + dotnet-quality
+      # "preview", which resolved to a release-candidate SDK on the runner while
+      # local builds used the GA SDK, so the shipped MSIX was never compiled by the
+      # toolchain the change had been tested with.
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
-          dotnet-quality: "preview"
+          global-json-file: global.json
 
       - name: Import signing certificate
         id: cert_import

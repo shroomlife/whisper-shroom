@@ -140,5 +140,5 @@ Pricing lives in `CostCalculator`, split into `MinutePricing` (duration-billed) 
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.9.0.0**
+- Current version: **1.9.1.0**
 - Bump the version with every release build / bug fix round, add a `CHANGELOG.md` entry, and tag the commit `v<version>` to trigger `.github/workflows/release.yml`.

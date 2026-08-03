@@ -2,6 +2,12 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.9.1.0] - 2026-08-03
+
+### Fixed
+- **Release build toolchain**: CI resolved a release-candidate .NET SDK while local builds used the GA SDK, so the published MSIX was never compiled by the toolchain the changes had been tested with. The SDK is now pinned in `global.json` for both.
+- **Sideload instructions**: The certificate filename in the release notes is taken from the built artifact instead of being assembled from the tag, which had produced a five-part name (`1.9.0.0.0`) that matched no file. Affected v1.8.1.0 through v1.9.0.0; those release notes were corrected retroactively.
+
 ## [1.9.0.0] - 2026-08-03
 
 ### Added
