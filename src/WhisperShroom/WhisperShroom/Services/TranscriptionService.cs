@@ -140,8 +140,15 @@ public sealed class TranscriptionService : IDisposable
         content.Add(fileContent, "file", "recording.wav");
         content.Add(new StringContent(effectiveModel), "model");
 
+        // gpt-transcribe replaced the singular "language" field with "languages[]" and rejects
+        // the request outright if both are sent, so the two forms are mutually exclusive.
         if (language is not null)
-            content.Add(new StringContent(language), "language");
+        {
+            var languageField = TranscriptionModelHelper.UsesLanguagesArray(effectiveModel)
+                ? "languages[]"
+                : "language";
+            content.Add(new StringContent(language), languageField);
+        }
 
         // whisper-1 needs verbose_json to get duration; gpt-4o-transcribe models return usage in json
         if (effectiveModel == "whisper-1")

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using WhisperShroom.Helpers;
 
 namespace WhisperShroom.Models;
 
@@ -23,7 +24,7 @@ public sealed class AppConfig
     public string? Language { get; set; } = "de";
 
     [JsonPropertyName("model")]
-    public string? Model { get; set; } = "whisper-1";
+    public string? Model { get; set; } = TranscriptionModelHelper.DefaultModelId;
 
     [JsonPropertyName("prompt_prefix")]
     public string? PromptPrefix { get; set; }

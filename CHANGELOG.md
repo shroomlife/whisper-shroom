@@ -2,6 +2,17 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.9.0.0] - 2026-08-03
+
+### Added
+- **GPT Transcribe**: Support for OpenAI's `gpt-transcribe` model, the currently recommended model for file transcription. It is more accurate than Whisper and cheaper at $0.0045 per minute versus $0.006. It is now the default for new installations; existing installations keep their configured model until changed in Settings.
+
+### Changed
+- Transcription requests now send the language hint as `languages[]` for `gpt-transcribe` and as `language` for all other models. The API rejects requests that send both.
+
+### Fixed
+- **Cost calculation**: Corrected the output token rate for `gpt-4o-transcribe` ($10.00 per 1M instead of $6.00) and `gpt-4o-mini-transcribe` ($5.00 per 1M instead of $3.00). Costs shown in History for those models were previously too low.
+
 ## [1.8.3.0] - 2026-06-01
 
 ### Added

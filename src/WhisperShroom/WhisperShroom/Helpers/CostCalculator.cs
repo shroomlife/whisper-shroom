@@ -6,16 +6,19 @@ internal static class CostCalculator
     private const decimal UsdToEur = 0.92m;
 
     // Pricing per 1M tokens (USD) - from https://developers.openai.com/api/docs/pricing/
+    // Input is the audio-token rate (these models bill transcription input as audio tokens),
+    // output is the text-token rate.
     private static readonly Dictionary<string, (decimal InputPer1M, decimal OutputPer1M)> TokenPricing = new()
     {
-        ["gpt-4o-transcribe"] = (6.00m, 6.00m),
-        ["gpt-4o-mini-transcribe"] = (3.00m, 3.00m),
-        ["gpt-4o-mini-transcribe-2025-12-15"] = (3.00m, 3.00m),
+        ["gpt-4o-transcribe"] = (6.00m, 10.00m),
+        ["gpt-4o-mini-transcribe"] = (3.00m, 5.00m),
+        ["gpt-4o-mini-transcribe-2025-12-15"] = (3.00m, 5.00m),
     };
 
     // Pricing per minute (USD) for duration-based models
     private static readonly Dictionary<string, decimal> MinutePricing = new()
     {
+        ["gpt-transcribe"] = 0.0045m,
         ["whisper-1"] = 0.006m,
     };
 
