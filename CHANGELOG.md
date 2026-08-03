@@ -2,6 +2,11 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.9.4.0] - 2026-08-03
+
+### Security
+- **CVE-2025-6965 (high, CVSS 7.2)**: The bundled SQLite engine was 3.49.1, which can corrupt memory when the number of aggregate terms exceeds the available columns. `SQLitePCLRaw` is pinned to 2.1.12, raising the engine to 3.53.3. `Microsoft.Data.Sqlite` 10.x still resolves the affected 2.1.11 by default; the pin can be removed once it ships a patched dependency itself. The existing history database was verified to open unchanged under the new engine (`PRAGMA integrity_check` passes).
+
 ## [1.9.3.0] - 2026-08-03
 
 ### Fixed
