@@ -50,8 +50,11 @@ jobs:
           echo "thumbprint=$($cert.Thumbprint)" >> $env:GITHUB_OUTPUT
           Write-Host "Certificate imported with thumbprint: $($cert.Thumbprint)"
 
+      # Locked mode fails the build if the resolved package graph differs from
+      # packages.lock.json, rather than silently shipping different versions than
+      # were tested locally.
       - name: Restore NuGet packages
-        run: dotnet restore ${{ env.PROJECT_PATH }}
+        run: dotnet restore ${{ env.PROJECT_PATH }} --locked-mode
 
       - name: Build signed MSIX
         run: >
