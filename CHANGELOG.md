@@ -2,6 +2,11 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.9.6.0] - 2026-08-03
+
+### Added
+- **Symbol package in releases**: The `.msixsym` produced since 1.9.5.0 is now attached to the GitHub release and described in the notes. It is not needed to run the app; it resolves stack traces from crash reports and is used for Store submissions. Like the certificate, it is optional: if a build produces none, the release is created without it and the workflow logs a warning.
+
 ## [1.9.5.0] - 2026-08-03
 
 ### Changed

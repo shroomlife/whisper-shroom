@@ -89,11 +89,34 @@ jobs:
             echo "cer_found=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # The symbol package stays in the versioned subfolder; only the .msix is copied to
+      # the dist/ root. Treated as optional like the certificate, because it is only
+      # produced when the C++ tools are present to supply mspdbcmf.exe.
+      - name: Find symbol package
+        id: symbols
+        shell: bash
+        run: |
+          SYM=$(find dist/ -name "*.msixsym" -type f | head -1)
+          if [ -n "$SYM" ]; then
+            echo "sym_path=$SYM" >> "$GITHUB_OUTPUT"
+            echo "sym_found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No symbol package found; the release will not carry one"
+            echo "sym_found=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload MSIX artifact
         uses: actions/upload-artifact@v7
         with:
           name: msix-sideload
           path: ${{ steps.artifact.outputs.msix_path }}
+
+      - name: Upload symbol package artifact
+        if: steps.symbols.outputs.sym_found == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: msix-symbols
+          path: ${{ steps.symbols.outputs.sym_path }}
 
       - name: Upload certificate artifact
         if: steps.cert.outputs.cer_found == 'true'
@@ -127,6 +150,13 @@ jobs:
           path: artifacts/
         continue-on-error: true
 
+      - name: Download symbol package
+        uses: actions/download-artifact@v8
+        with:
+          name: msix-symbols
+          path: artifacts/
+        continue-on-error: true
+
       # The certificate filename is read from the downloaded artifact instead of being
       # rebuilt from the tag. Constructing it meant hardcoding a trailing ".0" to pad
       # 3-part tags (v1.8.0) up to the 4-part MSIX version, which then produced a
@@ -135,6 +165,7 @@ jobs:
       - name: Compose release notes
         run: |
           CER_NAME=$(find artifacts -maxdepth 1 -name '*.cer' -printf '%f\n' | head -1)
+          SYM_NAME=$(find artifacts -maxdepth 1 -name '*.msixsym' -printf '%f\n' | head -1)
 
           cat > release-body.md <<'EOF'
           ## Installation
@@ -167,6 +198,16 @@ jobs:
 
           > **Note:** The certificate only needs to be installed once. Future updates can be installed by just downloading the new `.msix`.
           EOF
+
+          if [ -n "$SYM_NAME" ]; then
+            cat >> release-body.md <<'EOF'
+
+          ### Debug symbols
+
+          `__SYM_NAME__` contains the PDBs for this build. It is not needed to run the app; it is used to resolve stack traces from crash reports and for Store submissions.
+          EOF
+            sed -i "s|__SYM_NAME__|${SYM_NAME}|g" release-body.md
+          fi
 
           echo "--- composed release body ---"
           cat release-body.md
