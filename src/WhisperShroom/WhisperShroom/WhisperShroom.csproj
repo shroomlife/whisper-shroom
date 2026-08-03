@@ -48,6 +48,38 @@
     <Content Include="Assets\icon.ico" />
   </ItemGroup>
 
+  <!--
+    The Windows App SDK packaging targets locate mspdbcmf.exe, which builds the symbol
+    package, through $(VsInstallRoot) or $(VCToolsInstallDir). Neither is set when
+    building with `dotnet build` outside a Developer Command Prompt, so every Release
+    build warned and silently skipped the symbol package, on this machine and on the CI
+    runner alike, even though the tool was installed in both cases.
+
+    vswhere is placed at a fixed location by the VS Installer, so resolving the install
+    root from it works in both environments. Only VsInstallRoot is set; the SDK's own
+    logic then picks the MSVC version and host architecture. If Visual Studio or the C++
+    tools are absent, the property stays empty and the SDK falls back to its previous
+    behaviour, warning included.
+  -->
+  <Target Name="ResolveVsInstallRootForSymbolPackage"
+          BeforeTargets="_EnsurePdbCmfExeFullPath"
+          Condition="'$(VsInstallRoot)' == '' and '$(VCToolsInstallDir)' == '' and '$(MsPdbCmfExeFullpath)' == ''">
+    <PropertyGroup>
+      <_VsWhereExe>$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe</_VsWhereExe>
+    </PropertyGroup>
+    <Exec Condition="Exists('$(_VsWhereExe)')"
+          Command="&quot;$(_VsWhereExe)&quot; -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_ResolvedVsInstallRoot" />
+    </Exec>
+    <PropertyGroup Condition="'$(_ResolvedVsInstallRoot)' != '' and Exists('$(_ResolvedVsInstallRoot)')">
+      <VsInstallRoot>$(_ResolvedVsInstallRoot)</VsInstallRoot>
+    </PropertyGroup>
+    <Message Importance="normal" Text="Symbol package: using VsInstallRoot=$(VsInstallRoot)" Condition="'$(VsInstallRoot)' != ''" />
+  </Target>
+
   <!-- Copy .msix to dist/ root after Release build -->
   <Target Name="CopyMsixToDistRoot" AfterTargets="Build" Condition="'$(Configuration)'=='Release' AND '$(GenerateAppxPackageOnBuild)'=='true'">
     <ItemGroup>

@@ -2,6 +2,12 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.9.5.0] - 2026-08-03
+
+### Changed
+- **Symbol package**: Every Release build warned that `mspdbcmf.exe` could not be found and skipped the symbol package. The tool was installed all along, but the Windows App SDK locates it through `VsInstallRoot`, which `dotnet build` does not set outside a Developer Command Prompt. The install root is now resolved through `vswhere`, which the VS Installer places at a fixed path, so it works on a developer machine and on the CI runner. Builds are warning-free and a `.msixsym` is produced again.
+- **CI runtime**: `actions/upload-artifact` and `softprops/action-gh-release` still targeted the deprecated Node.js 20 and were being force-run on Node.js 24. Both moved to their current major versions, which target Node.js 24 natively. The remaining actions already did.
+
 ## [1.9.4.0] - 2026-08-03
 
 ### Security
