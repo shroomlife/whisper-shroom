@@ -23,6 +23,16 @@
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <PublishReadyToRun Condition="'$(RuntimeIdentifier)' != ''">true</PublishReadyToRun>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <!--
+      Roslyn embeds the absolute build directory in the assembly (PE debug directory +
+      source paths), so the same commit produced different binaries on a dev machine
+      (C:\code\...) and on the CI runner (D:\a\...). Mapping the project directory to a
+      fixed virtual root makes the compiled output independent of where it was built,
+      and keeps local directory layout out of the shipped package.
+      Trade-off: stack traces report /_/Views/MainWindow.xaml.cs instead of an absolute
+      path. File name and line number are unaffected.
+    -->
+    <PathMap>$(MSBuildThisFileDirectory)=/_/</PathMap>
   </PropertyGroup>
 
   <ItemGroup>

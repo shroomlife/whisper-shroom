@@ -2,6 +2,11 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.9.2.0] - 2026-08-03
+
+### Changed
+- **Reproducible builds**: The compiler no longer embeds the absolute build directory in the assembly, so the same commit produces the same binary on a developer machine and on CI, and the local directory layout no longer ships inside the package. Stack traces now report paths as `/_/Views/MainWindow.xaml.cs`; file names and line numbers are unchanged.
+
 ## [1.9.1.0] - 2026-08-03
 
 ### Fixed
