@@ -10,109 +10,125 @@
       },
       "H.NotifyIcon.WinUI": {
         "type": "Direct",
-        "requested": "[2.*, )",
-        "resolved": "2.4.1",
-        "contentHash": "QoBt6cEMvbDESwDpbUXzM+2zKqeYk25++BtFocE0PiYzihn2w8/LqTz9gHA0b0TawW/wBkAjK9w+JpCL75V+Yg==",
+        "requested": "[2.5.0-beta.*, )",
+        "resolved": "2.5.0-beta.3",
+        "contentHash": "gnFWR3xbfOSEKDbLvpP3S33AmTKJYf4NqA6WhAurH5za+WTWQsnp4pylaGuw9yonDbyLSmJIiek2ZQueGLI+nw==",
         "dependencies": {
-          "H.NotifyIcon": "2.4.1",
-          "Microsoft.WindowsAppSDK": "1.6.250108002"
+          "H.NotifyIcon": "2.5.0-beta.3",
+          "Microsoft.WindowsAppSDK.WinUI": "1.8.251105000"
         }
       },
       "Microsoft.Data.Sqlite": {
         "type": "Direct",
         "requested": "[10.*, )",
-        "resolved": "10.0.10",
-        "contentHash": "58JwZ39lCvRXHfV5O6RQfbHEDu8ZsXI7weRoVRR4jrGRxxkS+qyeuGrN2xD+9VYEICApYr0iTSL6PuU+DdsvPg==",
+        "resolved": "10.0.14",
+        "contentHash": "muyroan6rKrf0omZL8UF7Kw5uOGp/yBg1L/XWvkFN3WhKaNtK2IWqRZw93nIwVqjhTVDO0l4CEGhHIh+mb+sKg==",
         "dependencies": {
-          "Microsoft.Data.Sqlite.Core": "10.0.10",
-          "SQLitePCLRaw.bundle_e_sqlite3": "2.1.11",
-          "SQLitePCLRaw.core": "2.1.11"
+          "Microsoft.Data.Sqlite.Core": "10.0.14",
+          "SQLitePCLRaw.bundle_e_sqlite3": "2.1.13",
+          "SQLitePCLRaw.core": "2.1.13"
         }
       },
       "Microsoft.Windows.CsWin32": {
         "type": "Direct",
         "requested": "[0.3.*, )",
-        "resolved": "0.3.298",
-        "contentHash": "moz/CojV5HSeJYV9pNVE6mWMKnJGvPgdD31EhBLyUJ8Ui06PBrH9oPFK1ljXbJJMM4EzKnkE1a0AtBbH1BHDGA==",
+        "resolved": "0.3.367",
+        "contentHash": "C4JVE3wmVjCvzpdBzC+HK/boVU6g4ZRDEZ7uDmMJHCkgjFHhiMb9vhe2+wffzWzyNNObpCsIAW4G1t+1CAIEWw==",
         "dependencies": {
           "Microsoft.Windows.SDK.Win32Docs": "0.1.42-alpha",
-          "Microsoft.Windows.SDK.Win32Metadata": "70.0.11-preview",
+          "Microsoft.Windows.SDK.Win32Metadata": "71.0.37-preview",
           "Microsoft.Windows.WDK.Win32Metadata": "0.13.25-experimental"
         }
       },
       "Microsoft.Windows.SDK.BuildTools": {
         "type": "Direct",
         "requested": "[10.0.*, )",
-        "resolved": "10.0.28000.2526",
-        "contentHash": "voeXXRC5EKuvnUCkPxkEhCbNuv/FM1RzjCQ3lj58Ju5AlVzh/9Lg+a7hqy57mh/00BH/9YNZCJRUjIZJrzTJ4w=="
+        "resolved": "10.0.28000.2957",
+        "contentHash": "nTsRheC9AO+if3BykWkRJ4QXkIMfkqufnBFPIcSEOj7rnX60fqiGrORnxzVFnIXJvsMIjlDOvs/K5EzMLA2RKQ=="
       },
-      "Microsoft.WindowsAppSDK": {
+      "Microsoft.WindowsAppSDK.Foundation": {
         "type": "Direct",
-        "requested": "[1.7.*, )",
-        "resolved": "1.7.260224002",
-        "contentHash": "0lLlJHbK/qFVnciJHr6xw3c/tQ6b6mtQYJs5Rvk5J5IhpxHzuWL+b63tvQxfSKDgLCPl0o2o8d2ynMoln2PDHw==",
+        "requested": "[2.6.*, )",
+        "resolved": "2.6.5",
+        "contentHash": "wd7+g7tRSEv1YMcxgPi1MZ7I4nfB5/nhcOkcOrnhJbeRtT2XLTtFDIxJ6cBxx/SOI2FJ+EocJXhisuCvBYB/4w==",
         "dependencies": {
-          "Microsoft.Web.WebView2": "1.0.2903.40",
-          "Microsoft.Windows.SDK.BuildTools": "10.0.22621.756"
+          "Microsoft.WindowsAppSDK.Base": "[2.6.5, 3.0.0)",
+          "Microsoft.WindowsAppSDK.InteractiveExperiences": "[2.6.5, 3.0.0)"
+        }
+      },
+      "Microsoft.WindowsAppSDK.Runtime": {
+        "type": "Direct",
+        "requested": "[2.6.*, )",
+        "resolved": "2.6.5",
+        "contentHash": "anTYWEcvxa5eB2EP9ZEzDQq2VI/mFqNg3E/aYcoRpphxfquj6VSj+gHDAMWQ3fU3RjQ+9KmMtSZkZ9So29QdDg==",
+        "dependencies": {
+          "Microsoft.WindowsAppSDK.Base": "2.6.5"
+        }
+      },
+      "Microsoft.WindowsAppSDK.WinUI": {
+        "type": "Direct",
+        "requested": "[2.6.*, )",
+        "resolved": "2.6.5",
+        "contentHash": "kGdcXPYSTEN5XdZd500dPH+zmq6gyDCCjyG5LwXzaa0tPG/6drYh5M+QmStfmLf7LnPKv5O6ZJucDspepSCo3g==",
+        "dependencies": {
+          "Microsoft.Web.WebView2": "1.0.3719.77",
+          "Microsoft.WindowsAppSDK.Base": "2.6.5",
+          "Microsoft.WindowsAppSDK.Foundation": "2.6.5",
+          "Microsoft.WindowsAppSDK.InteractiveExperiences": "2.6.5"
         }
       },
       "NAudio": {
         "type": "Direct",
         "requested": "[2.*, )",
-        "resolved": "2.3.0",
-        "contentHash": "xN+Lzlu9DmXqBiL6XkP0VZmgTxZPdSGjVSWtKG9HKuar3LhIYNOIYQETieigS+QDS+nrs1QmHbBWWOru0nWA5A==",
+        "resolved": "2.4.0",
+        "contentHash": "/XEZxytbWnwHbdRg5iEELr5rKPBnY9QheYMWUpamyka6T3OEaui+qqrINF1mGpAvDw8Q/lKvBsdJTzM/bchDyA==",
         "dependencies": {
-          "NAudio.Asio": "2.3.0",
-          "NAudio.Core": "2.3.0",
-          "NAudio.Midi": "2.3.0",
-          "NAudio.Wasapi": "2.3.0",
-          "NAudio.WinForms": "2.3.0",
-          "NAudio.WinMM": "2.3.0"
-        }
-      },
-      "SQLitePCLRaw.bundle_e_sqlite3": {
-        "type": "Direct",
-        "requested": "[2.1.12, )",
-        "resolved": "2.1.12",
-        "contentHash": "mAgscpQMLw5/nfA1Q5oJVAT29yROUo1ifZGbbTpx/lwZpSxMUGoYbKfmvdm8oXER+RzxqBmmQzeBEVKfeHv2nw==",
-        "dependencies": {
-          "SQLitePCLRaw.lib.e_sqlite3": "2.1.12",
-          "SQLitePCLRaw.provider.e_sqlite3": "2.1.12"
+          "NAudio.Asio": "2.4.0",
+          "NAudio.Core": "2.4.0",
+          "NAudio.Midi": "2.4.0",
+          "NAudio.Wasapi": "2.4.0",
+          "NAudio.WinForms": "2.4.0",
+          "NAudio.WinMM": "2.4.0"
         }
       },
       "H.GeneratedIcons.System.Drawing": {
         "type": "Transitive",
-        "resolved": "2.4.1",
-        "contentHash": "gjYhuwHQzISqKhcNYaRdDhzKCoqLZii+6TTHP0MQf4Q9+H6z4f4A5Xu/j8B8XpFPQ1grCMlQYREvNyNJT9Q/Bg==",
+        "resolved": "2.5.0-beta.3",
+        "contentHash": "5hd0dF96l8I/unHusH93HjzrJod4t9p19WbfWr0v30CHGnFhmaaqx01y4eZiUd3WVuhfWNXsBJIFAQxiELOPBw==",
         "dependencies": {
           "System.Drawing.Common": "10.0.0"
         }
       },
       "H.NotifyIcon": {
         "type": "Transitive",
-        "resolved": "2.4.1",
-        "contentHash": "nNPgNzo5UHcWYpVLO3AsRlH8fKE9shBA7/WLpZrFZUFbzpKGcLnz15Kmg0pQ851aboAfm3YuHjYFsYQges/pyw==",
+        "resolved": "2.5.0-beta.3",
+        "contentHash": "cYnvGqyVbZBEAYuKlMhZnjQAqDUG+ugKu4rYMOGehuLFyzo4mXpajKaW2Wv92cGJfm47JU612Sz4ul5wIMkHEg==",
         "dependencies": {
-          "H.GeneratedIcons.System.Drawing": "2.4.1"
+          "H.GeneratedIcons.System.Drawing": "2.5.0-beta.3"
         }
       },
       "Microsoft.Data.Sqlite.Core": {
         "type": "Transitive",
-        "resolved": "10.0.10",
-        "contentHash": "TPCs0ldm7AWqcKmp6f/Xr+14sat7hx4rHfRlS4RgCURBH2thEWbAKEyX7cCWr63zVJVOJIJZTg2cBiUXa8ys6g==",
+        "resolved": "10.0.14",
+        "contentHash": "1p9rO3Q2X/L/9YrYog3vaDzi8u+WZfJCOkDYoHqmofqYP0DLPLPyZcS2Rnh/79JXAodgbs1AgsaNwLpIvC3Xew==",
         "dependencies": {
-          "SQLitePCLRaw.core": "2.1.11"
+          "SQLitePCLRaw.core": "2.1.13"
         }
       },
       "Microsoft.Web.WebView2": {
         "type": "Transitive",
-        "resolved": "1.0.2903.40",
-        "contentHash": "THrzYAnJgE3+cNH+9Epr44XjoZoRELdVpXlWGPs6K9C9G6TqyDfVCeVAR/Er8ljLitIUX5gaSkPsy9wRhD1sgQ=="
+        "resolved": "1.0.3719.77",
+        "contentHash": "t+ucyKw5NTwMjsUrDF6R9Lk40lpcKQD1/HgyGFxl49tdA4h9dKlsj6FYGEmDRpFNfnTpENuTypMcdbrlkqBdDA=="
       },
       "Microsoft.Win32.SystemEvents": {
         "type": "Transitive",
         "resolved": "10.0.0",
         "contentHash": "bYdnhuD0XxcVTrxc8RyBjXo+AXYWJPnda3clhGz2Kakleyun1PyrzYV8RezT7ZYmR9OBSOgvpFQcvHo/K8Y90w=="
+      },
+      "Microsoft.Windows.SDK.BuildTools.MSIX": {
+        "type": "Transitive",
+        "resolved": "1.7.251221100",
+        "contentHash": "f4aIZJ0NUth2403oxrpR+9rxVzZVI6dabqB21u8ncnk8eJAKCs9m77E4iYAnvP1YwrRe4axz3f8+yUcttNSfEA=="
       },
       "Microsoft.Windows.SDK.Win32Docs": {
         "type": "Transitive",
@@ -121,8 +137,8 @@
       },
       "Microsoft.Windows.SDK.Win32Metadata": {
         "type": "Transitive",
-        "resolved": "70.0.11-preview",
-        "contentHash": "i8Dv2KCKzH8MQAsgLeUa5zFGyQOoz+TlvnbkFUkjsUtqhj4oguVj9rDpVACs5fLayZbwItOSllf+bhwr+z2yeg=="
+        "resolved": "71.0.37-preview",
+        "contentHash": "0y4uKnOzE+k2zUCxcTOJTOuRuOFiW01A+j1GpjyN11saEjkESLW9XrWkGYG/zdlAAb8oRk4oLdokkcx0X2z7yA=="
       },
       "Microsoft.Windows.WDK.Win32Metadata": {
         "type": "Transitive",
@@ -132,67 +148,93 @@
           "Microsoft.Windows.SDK.Win32Metadata": "63.0.31-preview"
         }
       },
+      "Microsoft.WindowsAppSDK.Base": {
+        "type": "Transitive",
+        "resolved": "2.6.5",
+        "contentHash": "/R+z6xrl4mIu6FmXNkdvMlL/Enl7pXgO5Q75LBJdls6uvieh3VTOn6jtvwtlywFnZMKfvsDP0Ckal6/phireJQ==",
+        "dependencies": {
+          "Microsoft.Windows.SDK.BuildTools": "10.0.26100.4654",
+          "Microsoft.Windows.SDK.BuildTools.MSIX": "1.7.251221100"
+        }
+      },
+      "Microsoft.WindowsAppSDK.InteractiveExperiences": {
+        "type": "Transitive",
+        "resolved": "2.6.5",
+        "contentHash": "WBpbDUPqOds+P+XrvawF8xietPS4VU4z4oT1CFQ+/IGYYszv37YSg2X6B0aOi506OFEjApW2UjWsgwkPxeUJqA==",
+        "dependencies": {
+          "Microsoft.WindowsAppSDK.Base": "2.6.5"
+        }
+      },
       "NAudio.Asio": {
         "type": "Transitive",
-        "resolved": "2.3.0",
-        "contentHash": "I+rAAPT8vmSEw4d4ie+AoSkrvNK6ylRrXznnjQKS+qZgTA9Jnt1Pxe0EaU8nXxOOq5h8ucBSWccBEw6I/J0nkQ==",
+        "resolved": "2.4.0",
+        "contentHash": "EAXpZcJ1gYehm83zIcs/8lQ0Fsuk5Wkuf365s1UNcyYaRZf0aRgZUUkmluBwnMuOiBklLHHmVNlvKhv4QeDQEA==",
         "dependencies": {
-          "NAudio.Core": "2.3.0"
+          "NAudio.Core": "2.4.0"
         }
       },
       "NAudio.Core": {
         "type": "Transitive",
-        "resolved": "2.3.0",
-        "contentHash": "jMd7r6dB6tAtXhOYL58ntPqwERNm1/Rhw5MKOIYvsnXzuX+PTGsa2VMam6n0npZYSwlSidKa4GAm4bFcXFUlcg=="
+        "resolved": "2.4.0",
+        "contentHash": "VDXi1Wp1CUFgMxYyyajaG8sM9c9v5Mf2AdJkYUnksqwENSqVlrXsPe9l/mG55pNIv9eMYXGHiIxVuhS7+a3BQg=="
       },
       "NAudio.Midi": {
         "type": "Transitive",
-        "resolved": "2.3.0",
-        "contentHash": "t8wvPFPHHQOHhoNMCaDE8OiYZoJuxmY4H6UPBtmnf+xx7oQuajFCqlG4Q00ID+tiEyj471WeVb4Nkylr4tDoow==",
+        "resolved": "2.4.0",
+        "contentHash": "A0rgl2A4gUaDf+JYJjoPwHDxoiX3r4WnLF7l/Yb0MxJwc2NuGmer30BdM/fxS+HkXgYZMnNZffg0fULJJRoPkg==",
         "dependencies": {
-          "NAudio.Core": "2.3.0"
+          "NAudio.Core": "2.4.0"
         }
       },
       "NAudio.Wasapi": {
         "type": "Transitive",
-        "resolved": "2.3.0",
-        "contentHash": "y5K2BxrLnvohgu5znzg5wRsai3YcuNXfrpo68i7PmCQqpK5MC/R24e5aO3OyN/XhfRr12e0QYV0OnUWEHi5SzA==",
+        "resolved": "2.4.0",
+        "contentHash": "DKwpFzgJkUkge4sR+5t/DND1SbuHOJXQX3BBqnmd0n/zjM/CqBqbKA1wMXKIKdN2R1PtETVDu5C9ODPif37hhw==",
         "dependencies": {
-          "NAudio.Core": "2.3.0"
+          "NAudio.Core": "2.4.0"
         }
       },
       "NAudio.WinForms": {
         "type": "Transitive",
-        "resolved": "2.3.0",
-        "contentHash": "vyKqFUlAZrZ0QPcCM1T+zimjYgC1cNDloHaiOdtV4S1eK4AGu3Dz1EE4yy/WgcneJwQNjGFaELY7b2TsL+g56w==",
+        "resolved": "2.4.0",
+        "contentHash": "qG2yjdQP5nLV5uwH/Ix6r52cOFfOGAUc5xQY8lm7qVCNq7i2jzwoK4Q6LketIW1iv8Ol+brpoAQhFiNcemiBzQ==",
         "dependencies": {
-          "NAudio.WinMM": "2.3.0"
+          "NAudio.WinMM": "2.4.0"
         }
       },
       "NAudio.WinMM": {
         "type": "Transitive",
-        "resolved": "2.3.0",
-        "contentHash": "5G1dRjsZm50T3luyuqcmI2BSvj3K4ZJaD/x776/0Epj88qOsOryDZG40+MufwIk1UFJSFWhRobBqtJYFc8Ss4g==",
+        "resolved": "2.4.0",
+        "contentHash": "mipx4Wx/C2c/ajptYaInJyakSq+33TjfQWSjFuOoq7JnU2E7nIkZj6pf9Qx4AwExPQ094Gn9R/jt52agiETkwQ==",
         "dependencies": {
-          "NAudio.Core": "2.3.0"
+          "NAudio.Core": "2.4.0"
+        }
+      },
+      "SQLitePCLRaw.bundle_e_sqlite3": {
+        "type": "Transitive",
+        "resolved": "2.1.13",
+        "contentHash": "NlDixlC7uHmo+ojXRgkNvN0tQtVGpLDZ3x2OpgNj+G07VHh5cXSszFDrAiC4BpUiPwkcaeuQkMV9WQ123xVtmQ==",
+        "dependencies": {
+          "SQLitePCLRaw.lib.e_sqlite3": "2.1.13",
+          "SQLitePCLRaw.provider.e_sqlite3": "2.1.13"
         }
       },
       "SQLitePCLRaw.core": {
         "type": "Transitive",
-        "resolved": "2.1.12",
-        "contentHash": "ETpNw9DY3ckWLgRRAeCHj+GKOuPi61aeczkXhgHexUvqoZBAYg8RYESE2J7O1M7+o6QbdSEZwrw9bfqztUVWXg=="
+        "resolved": "2.1.13",
+        "contentHash": "2joofoinuHBFs0nMX3nKuXgxpXryRkCOdM2Ua6HBqQLLy6IW+5f28ZI+HAvMyF8vG7XfNz/lwfBfE6V4juru8Q=="
       },
       "SQLitePCLRaw.lib.e_sqlite3": {
         "type": "Transitive",
-        "resolved": "2.1.12",
-        "contentHash": "fWi8Dbknuhgg72fWinIdjXVaqO1hHL4YBBwVLnr7e1c9TAZwJ0QE38j9syW1hwx6HaqEVTwI+O07WPdZn8Rp0w=="
+        "resolved": "2.1.13",
+        "contentHash": "D2UAuiGxFYBqeRXjjjGgvJ5UQifzn6wefmSqeKU7XcNGKLbJRP6X7kcPZ6opOBJGdCIlgbSxTvDpBbLvsN594A=="
       },
       "SQLitePCLRaw.provider.e_sqlite3": {
         "type": "Transitive",
-        "resolved": "2.1.12",
-        "contentHash": "W3oH4XIfCzFrgUSDKHhN6N+dgzA5YHOR2VxX8GB6Qy7CyrJJgxPEG8NirgYWlPQC5P2jz2knSsexWu4tDUL33g==",
+        "resolved": "2.1.13",
+        "contentHash": "ZU60dSqoSNRe49KcQDUmOVgdRtjITOssVXFtiISs+zJXDI4D2Sndwpn2NOtzDQNPu0ZAvpoLPQ+GLKv6iEZn8Q==",
         "dependencies": {
-          "SQLitePCLRaw.core": "2.1.12"
+          "SQLitePCLRaw.core": "2.1.13"
         }
       },
       "System.Drawing.Common": {
@@ -205,20 +247,20 @@
       }
     },
     "net10.0-windows10.0.26100/win-arm64": {
-      "Microsoft.WindowsAppSDK": {
+      "Microsoft.WindowsAppSDK.Foundation": {
         "type": "Direct",
-        "requested": "[1.7.*, )",
-        "resolved": "1.7.260224002",
-        "contentHash": "0lLlJHbK/qFVnciJHr6xw3c/tQ6b6mtQYJs5Rvk5J5IhpxHzuWL+b63tvQxfSKDgLCPl0o2o8d2ynMoln2PDHw==",
+        "requested": "[2.6.*, )",
+        "resolved": "2.6.5",
+        "contentHash": "wd7+g7tRSEv1YMcxgPi1MZ7I4nfB5/nhcOkcOrnhJbeRtT2XLTtFDIxJ6cBxx/SOI2FJ+EocJXhisuCvBYB/4w==",
         "dependencies": {
-          "Microsoft.Web.WebView2": "1.0.2903.40",
-          "Microsoft.Windows.SDK.BuildTools": "10.0.22621.756"
+          "Microsoft.WindowsAppSDK.Base": "[2.6.5, 3.0.0)",
+          "Microsoft.WindowsAppSDK.InteractiveExperiences": "[2.6.5, 3.0.0)"
         }
       },
       "Microsoft.Web.WebView2": {
         "type": "Transitive",
-        "resolved": "1.0.2903.40",
-        "contentHash": "THrzYAnJgE3+cNH+9Epr44XjoZoRELdVpXlWGPs6K9C9G6TqyDfVCeVAR/Er8ljLitIUX5gaSkPsy9wRhD1sgQ=="
+        "resolved": "1.0.3719.77",
+        "contentHash": "t+ucyKw5NTwMjsUrDF6R9Lk40lpcKQD1/HgyGFxl49tdA4h9dKlsj6FYGEmDRpFNfnTpENuTypMcdbrlkqBdDA=="
       },
       "Microsoft.Win32.SystemEvents": {
         "type": "Transitive",
@@ -227,25 +269,25 @@
       },
       "SQLitePCLRaw.lib.e_sqlite3": {
         "type": "Transitive",
-        "resolved": "2.1.12",
-        "contentHash": "fWi8Dbknuhgg72fWinIdjXVaqO1hHL4YBBwVLnr7e1c9TAZwJ0QE38j9syW1hwx6HaqEVTwI+O07WPdZn8Rp0w=="
+        "resolved": "2.1.13",
+        "contentHash": "D2UAuiGxFYBqeRXjjjGgvJ5UQifzn6wefmSqeKU7XcNGKLbJRP6X7kcPZ6opOBJGdCIlgbSxTvDpBbLvsN594A=="
       }
     },
     "net10.0-windows10.0.26100/win-x64": {
-      "Microsoft.WindowsAppSDK": {
+      "Microsoft.WindowsAppSDK.Foundation": {
         "type": "Direct",
-        "requested": "[1.7.*, )",
-        "resolved": "1.7.260224002",
-        "contentHash": "0lLlJHbK/qFVnciJHr6xw3c/tQ6b6mtQYJs5Rvk5J5IhpxHzuWL+b63tvQxfSKDgLCPl0o2o8d2ynMoln2PDHw==",
+        "requested": "[2.6.*, )",
+        "resolved": "2.6.5",
+        "contentHash": "wd7+g7tRSEv1YMcxgPi1MZ7I4nfB5/nhcOkcOrnhJbeRtT2XLTtFDIxJ6cBxx/SOI2FJ+EocJXhisuCvBYB/4w==",
         "dependencies": {
-          "Microsoft.Web.WebView2": "1.0.2903.40",
-          "Microsoft.Windows.SDK.BuildTools": "10.0.22621.756"
+          "Microsoft.WindowsAppSDK.Base": "[2.6.5, 3.0.0)",
+          "Microsoft.WindowsAppSDK.InteractiveExperiences": "[2.6.5, 3.0.0)"
         }
       },
       "Microsoft.Web.WebView2": {
         "type": "Transitive",
-        "resolved": "1.0.2903.40",
-        "contentHash": "THrzYAnJgE3+cNH+9Epr44XjoZoRELdVpXlWGPs6K9C9G6TqyDfVCeVAR/Er8ljLitIUX5gaSkPsy9wRhD1sgQ=="
+        "resolved": "1.0.3719.77",
+        "contentHash": "t+ucyKw5NTwMjsUrDF6R9Lk40lpcKQD1/HgyGFxl49tdA4h9dKlsj6FYGEmDRpFNfnTpENuTypMcdbrlkqBdDA=="
       },
       "Microsoft.Win32.SystemEvents": {
         "type": "Transitive",
@@ -254,25 +296,25 @@
       },
       "SQLitePCLRaw.lib.e_sqlite3": {
         "type": "Transitive",
-        "resolved": "2.1.12",
-        "contentHash": "fWi8Dbknuhgg72fWinIdjXVaqO1hHL4YBBwVLnr7e1c9TAZwJ0QE38j9syW1hwx6HaqEVTwI+O07WPdZn8Rp0w=="
+        "resolved": "2.1.13",
+        "contentHash": "D2UAuiGxFYBqeRXjjjGgvJ5UQifzn6wefmSqeKU7XcNGKLbJRP6X7kcPZ6opOBJGdCIlgbSxTvDpBbLvsN594A=="
       }
     },
     "net10.0-windows10.0.26100/win-x86": {
-      "Microsoft.WindowsAppSDK": {
+      "Microsoft.WindowsAppSDK.Foundation": {
         "type": "Direct",
-        "requested": "[1.7.*, )",
-        "resolved": "1.7.260224002",
-        "contentHash": "0lLlJHbK/qFVnciJHr6xw3c/tQ6b6mtQYJs5Rvk5J5IhpxHzuWL+b63tvQxfSKDgLCPl0o2o8d2ynMoln2PDHw==",
+        "requested": "[2.6.*, )",
+        "resolved": "2.6.5",
+        "contentHash": "wd7+g7tRSEv1YMcxgPi1MZ7I4nfB5/nhcOkcOrnhJbeRtT2XLTtFDIxJ6cBxx/SOI2FJ+EocJXhisuCvBYB/4w==",
         "dependencies": {
-          "Microsoft.Web.WebView2": "1.0.2903.40",
-          "Microsoft.Windows.SDK.BuildTools": "10.0.22621.756"
+          "Microsoft.WindowsAppSDK.Base": "[2.6.5, 3.0.0)",
+          "Microsoft.WindowsAppSDK.InteractiveExperiences": "[2.6.5, 3.0.0)"
         }
       },
       "Microsoft.Web.WebView2": {
         "type": "Transitive",
-        "resolved": "1.0.2903.40",
-        "contentHash": "THrzYAnJgE3+cNH+9Epr44XjoZoRELdVpXlWGPs6K9C9G6TqyDfVCeVAR/Er8ljLitIUX5gaSkPsy9wRhD1sgQ=="
+        "resolved": "1.0.3719.77",
+        "contentHash": "t+ucyKw5NTwMjsUrDF6R9Lk40lpcKQD1/HgyGFxl49tdA4h9dKlsj6FYGEmDRpFNfnTpENuTypMcdbrlkqBdDA=="
       },
       "Microsoft.Win32.SystemEvents": {
         "type": "Transitive",
@@ -281,8 +323,8 @@
       },
       "SQLitePCLRaw.lib.e_sqlite3": {
         "type": "Transitive",
-        "resolved": "2.1.12",
-        "contentHash": "fWi8Dbknuhgg72fWinIdjXVaqO1hHL4YBBwVLnr7e1c9TAZwJ0QE38j9syW1hwx6HaqEVTwI+O07WPdZn8Rp0w=="
+        "resolved": "2.1.13",
+        "contentHash": "D2UAuiGxFYBqeRXjjjGgvJ5UQifzn6wefmSqeKU7XcNGKLbJRP6X7kcPZ6opOBJGdCIlgbSxTvDpBbLvsN594A=="
       }
     }
   }

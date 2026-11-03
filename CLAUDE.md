@@ -81,11 +81,11 @@ src/WhisperShroom/WhisperShroom/
 
 | Area | Technology | Why |
 |------|-----------|-----|
-| UI Framework | WinUI 3 (Windows App SDK 1.7) | Native Win11 Fluent Design |
+| UI Framework | WinUI 3 (Windows App SDK 2.6) | Native Win11 Fluent Design |
 | MVVM | CommunityToolkit.Mvvm 8 | Source-generated, AOT-compatible partial properties |
 | Audio | NAudio 2 (WasapiCapture) | Direct WASAPI device enumeration, matches Win11 Sound Settings |
 | Global Hotkey | CsWin32 P/Invoke (RegisterHotKey) | Type-safe Win32 interop |
-| Tray Icon | H.NotifyIcon.WinUI 2 | WinUI 3-compatible system tray (icon + click detection only) |
+| Tray Icon | H.NotifyIcon.WinUI 2.5 (prerelease) | WinUI 3-compatible system tray (icon + click detection only) |
 | Tray Context Menu | Win32 TrackPopupMenuEx (manual P/Invoke) | H.NotifyIcon's menu modes have positioning/sizing bugs |
 | OpenAI API | HttpClient (no SDK) | Single endpoint, minimal dependencies |
 | History DB | Microsoft.Data.Sqlite 10 | MS-recommended for WinUI 3, uses Windows-bundled SQLite |
@@ -140,5 +140,5 @@ Pricing lives in `CostCalculator`, split into `MinutePricing` (duration-billed) 
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.9.6.0**
+- Current version: **1.10.0.0**
 - Bump the version with every release build / bug fix round, add a `CHANGELOG.md` entry, and tag the commit `v<version>` to trigger `.github/workflows/release.yml`.

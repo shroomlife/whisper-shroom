@@ -2,6 +2,18 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.10.0.0] - 2026-11-03
+
+### Known issues
+- **Crash when UI Automation clients query the window (not fixed)**: The app can be terminated by a fail-fast (`0xc000027b`, stowed `RPC_E_WRONG_THREAD`) without any user action. The symbolized crash dump shows a cross-process UI Automation client asking for the window's bounding rectangle on the UI Automation I/O thread; `CUIAWindow::get_BoundingRectangle` reaches `CXamlIslandRoot::GetScreenOffset`, which fails fast when called off the UI thread. No app code is involved, so the managed crash handlers cannot see it and `crash.log` stays empty. This is a framework bug tracked as microsoft/microsoft-ui-xaml#11139 and still reproduces with Windows App SDK 2.6.5.
+
+### Changed
+- **Windows App SDK 1.7 to 2.6.5**: 1.7 has been out of support since 2026-03-18 and no longer receives fixes. 2.6.5 is the current stable release. Installing the app now requires the Windows App Runtime 2.x framework package (`Microsoft.WindowsAppRuntime.2`).
+- **Component packages instead of the metapackage**: Since 2.x the `Microsoft.WindowsAppSDK` metapackage also pulls Windows ML, Windows AI, Search and Widgets, which put `onnxruntime.dll` and `DirectML.dll` for every architecture into the MSIX and grew it from 29 MB to 82 MB. The app references only `Microsoft.WindowsAppSDK.WinUI`, `.Foundation` and `.Runtime` now, and the package is back at 29 MB.
+- **H.NotifyIcon.WinUI 2.5.0-beta.3**: The stable 2.4.x line depends on the 1.6 metapackage, which collides with the 2.x component packages. 2.5 depends on `Microsoft.WindowsAppSDK.WinUI` only.
+- **Dependency refresh**: Changing the SDK reference invalidates the lock file, so NuGet resolved the full graph again within the declared ranges: `Microsoft.Data.Sqlite` 10.0.14, `NAudio` 2.4.0, `Microsoft.Windows.CsWin32` 0.3.367, `Microsoft.Windows.SDK.BuildTools` 10.0.28000.2957.
+- **SQLitePCLRaw pin removed**: `Microsoft.Data.Sqlite` 10.0.14 now requires `SQLitePCLRaw` 2.1.13 itself, which bundles the same patched SQLite 3.53.3 as the former 2.1.12 pin (CVE-2025-6965 stays fixed). The explicit pin turned into a downgrade error and is gone.
+
 ## [1.9.6.0] - 2026-08-03
 
 ### Added

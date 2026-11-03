@@ -83,7 +83,7 @@ Requires **.NET 10 SDK** and the **Windows App SDK**.
 
 | Component | Technology |
 |-----------|-----------|
-| UI Framework | WinUI 3 (Windows App SDK 1.7) |
+| UI Framework | WinUI 3 (Windows App SDK 2.6) |
 | Runtime | .NET 10 (C#) |
 | MVVM | CommunityToolkit.Mvvm |
 | Audio Capture | NAudio (WASAPI) |
