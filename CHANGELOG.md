@@ -2,6 +2,19 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.13.0.0] - 2026-11-03
+
+### Added
+- **Tray mode (default)**: Recording no longer opens the window. The tray icon shows the state instead: a red badge while recording, a blue badge while transcribing, and the tooltip says what is happening and which hotkey stops the recording. The result lands on the clipboard and in the notification as before. The window opens automatically on any error (with Retry), and clicking the tray icon still works as before.
+- **Setting "Show window while recording"**: Restores the previous behavior where the window opens for every recording. Stored as `show_window_while_recording`, off by default.
+
+### Changed
+- **Closing the window in tray mode keeps the recording**: With the window as the recording UI, closing it still cancels the recording. In tray mode the window is optional, so hiding it no longer discards a running recording.
+- **Recording animation only when visible**: The pulsing dot runs only while the window is shown.
+
+### Why
+The UI Automation fail-fast crash (microsoft/microsoft-ui-xaml#11139) only affects visible WinUI windows; a cross-process UI Automation client cannot reach the XAML tree of a hidden window. The tray icon is a plain Win32 notification icon, so tray mode keeps the window hidden during everyday use and out of reach of that framework bug.
+
 ## [1.12.0.0] - 2026-11-03
 
 ### Changed

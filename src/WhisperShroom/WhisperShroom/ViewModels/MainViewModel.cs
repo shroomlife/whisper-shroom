@@ -100,7 +100,6 @@ public partial class MainViewModel : ObservableObject
             ShowSettingsOnError = true;
             ErrorMessage = "No API key configured. Please add your OpenAI API key in Settings.";
             CurrentState = AppState.Error;
-            App.MainAppWindow.ShowAndActivate();
             return;
         }
 
@@ -118,8 +117,9 @@ public partial class MainViewModel : ObservableObject
             RecordingTime = "00:00";
             CurrentState = AppState.Recording;
 
-            // Show the main window
-            App.MainAppWindow.ShowAndActivate();
+            // In tray mode the tray icon shows the recording; the window stays hidden.
+            if (config.ShowWindowWhileRecording)
+                App.MainAppWindow.ShowAndActivate();
 
             // Start UI timer
             _timer = _dispatcher.CreateTimer();
@@ -131,8 +131,23 @@ public partial class MainViewModel : ObservableObject
         {
             ErrorMessage = ex.Message;
             CurrentState = AppState.Error;
-            App.MainAppWindow.ShowAndActivate();
         }
+    }
+
+    /// <summary>
+    /// Single place that mirrors the state outside the view model: the tray icon always
+    /// shows it, and every error brings up the window (with Retry), in both window modes.
+    /// The constructor sets the initial state before the window exists, hence the null check.
+    /// </summary>
+    partial void OnCurrentStateChanged(AppState value)
+    {
+        if (App.MainAppWindow is not { } window)
+            return;
+
+        window.SetTrayState(value);
+
+        if (value == AppState.Error)
+            window.ShowAndActivate();
     }
 
     [RelayCommand]

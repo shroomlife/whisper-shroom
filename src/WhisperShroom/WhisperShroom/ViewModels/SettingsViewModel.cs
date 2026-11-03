@@ -38,6 +38,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool NotificationsEnabled { get; set; }
 
+    [ObservableProperty]
+    public partial bool ShowWindowWhileRecording { get; set; }
+
     public string Prefix { get; set; }
 
     public string Suffix { get; set; }
@@ -74,6 +77,7 @@ public partial class SettingsViewModel : ObservableObject
 
         AutoCopyEnabled = config.AutoCopyEnabled;
         NotificationsEnabled = config.NotificationsEnabled;
+        ShowWindowWhileRecording = config.ShowWindowWhileRecording;
 
         // Prefix / Suffix
         Prefix = config.PromptPrefix ?? "";
@@ -153,6 +157,7 @@ public partial class SettingsViewModel : ObservableObject
         config.Model = TranscriptionModelHelper.ToModelId(SelectedModel);
         config.AutoCopyEnabled = AutoCopyEnabled;
         config.NotificationsEnabled = NotificationsEnabled;
+        config.ShowWindowWhileRecording = ShowWindowWhileRecording;
         config.PromptPrefix = string.IsNullOrEmpty(Prefix) ? null : Prefix;
         config.PromptSuffix = string.IsNullOrEmpty(Suffix) ? null : Suffix;
 

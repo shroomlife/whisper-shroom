@@ -14,6 +14,13 @@ public sealed partial class MainWindow : Window
     private readonly AppWindow _appWindow;
     private TaskbarIcon? _trayIcon;
 
+    // Tray icons per state, loaded once. The tray icon is plain Win32 (Shell_NotifyIcon), so
+    // showing state there does not expose a XAML window to UI Automation clients.
+    private System.Drawing.Icon? _iconReady;
+    private System.Drawing.Icon? _iconRecording;
+    private System.Drawing.Icon? _iconTranscribing;
+    private Models.AppState _trayState = Models.AppState.Ready;
+
     private const int WindowWidth = 600;
     private const int WindowHeight = 500;
 
@@ -63,9 +70,21 @@ public sealed partial class MainWindow : Window
         _appWindow.Closing += OnClosing;
     }
 
+    private static System.Drawing.Icon? LoadTrayIcon(string fileName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Assets", fileName);
+        if (!File.Exists(path))
+            return null;
+
+        using var stream = File.OpenRead(path);
+        return new System.Drawing.Icon(stream);
+    }
+
     private void SetupTrayIcon()
     {
-        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "icon.ico");
+        _iconReady = LoadTrayIcon("icon.ico");
+        _iconRecording = LoadTrayIcon("icon-recording.ico");
+        _iconTranscribing = LoadTrayIcon("icon-transcribing.ico");
 
         _trayIcon = new TaskbarIcon
         {
@@ -73,11 +92,8 @@ public sealed partial class MainWindow : Window
             Id = new Guid("A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D")
         };
 
-        if (File.Exists(iconPath))
-        {
-            using var stream = File.OpenRead(iconPath);
-            _trayIcon.Icon = new System.Drawing.Icon(stream);
-        }
+        if (_iconReady is not null)
+            _trayIcon.Icon = _iconReady;
 
         UpdateTrayTooltip();
 
@@ -223,15 +239,42 @@ public sealed partial class MainWindow : Window
     public void Hide()
     {
         _appWindow.Hide();
+        RootPage.SetWindowVisible(false);
+    }
+
+    /// <summary>Reflects the recording state on the tray icon and its tooltip.</summary>
+    public void SetTrayState(Models.AppState state)
+    {
+        _trayState = state;
+
+        if (_trayIcon is null)
+            return;
+
+        var icon = state switch
+        {
+            Models.AppState.Recording => _iconRecording,
+            Models.AppState.Loading => _iconTranscribing,
+            _ => _iconReady
+        };
+
+        if (icon is not null)
+            _trayIcon.Icon = icon;
+
+        UpdateTrayTooltip();
     }
 
     public void UpdateTrayTooltip()
     {
-        if (_trayIcon is not null)
+        if (_trayIcon is null)
+            return;
+
+        var hotkey = App.ConfigService.Config.Hotkey.ToUpperInvariant();
+        _trayIcon.ToolTipText = _trayState switch
         {
-            var hotkey = App.ConfigService.Config.Hotkey.ToUpperInvariant();
-            _trayIcon.ToolTipText = $"WhisperShroom ({hotkey})";
-        }
+            Models.AppState.Recording => $"WhisperShroom: Recording... ({hotkey} to stop)",
+            Models.AppState.Loading => "WhisperShroom: Transcribing...",
+            _ => $"WhisperShroom ({hotkey})"
+        };
     }
 
     private void CenterOnScreen()
@@ -248,9 +291,13 @@ public sealed partial class MainWindow : Window
     private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         args.Cancel = true;
-        _appWindow.Hide();
+        Hide();
 
-        if (App.MainViewModel.CurrentState == Models.AppState.Recording)
+        // With the window as the recording UI, closing it cancels the recording (as before).
+        // In tray mode the window is optional and the tray icon keeps showing the recording,
+        // so hiding the window must not discard it.
+        if (App.ConfigService.Config.ShowWindowWhileRecording &&
+            App.MainViewModel.CurrentState == Models.AppState.Recording)
         {
             App.MainViewModel.CancelRecordingCommand.Execute(null);
         }
@@ -269,12 +316,16 @@ public sealed partial class MainWindow : Window
         }
 
         this.Activate();
+        RootPage.SetWindowVisible(true);
     }
 
     public void ForceClose()
     {
         _trayIcon?.Dispose();
         _trayIcon = null;
+        _iconReady?.Dispose();
+        _iconRecording?.Dispose();
+        _iconTranscribing?.Dispose();
         _appWindow.Closing -= OnClosing;
         this.Close();
     }

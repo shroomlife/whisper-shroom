@@ -31,4 +31,11 @@ public sealed class AppConfig
 
     [JsonPropertyName("prompt_suffix")]
     public string? PromptSuffix { get; set; }
+
+    /// <summary>
+    /// When false (default), recording and transcription only show their state on the tray
+    /// icon; the main window opens on errors or when the user opens it.
+    /// </summary>
+    [JsonPropertyName("show_window_while_recording")]
+    public bool ShowWindowWhileRecording { get; set; }
 }

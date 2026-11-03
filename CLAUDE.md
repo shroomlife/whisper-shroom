@@ -101,6 +101,8 @@ Target framework is `net10.0-windows10.0.26100.0` with `TargetPlatformMinVersion
 `AppState` drives UI visibility via `x:Bind` across the five panels in `MainPage.xaml`:
 `Ready` -> `Recording` (timer, pulsing dot, silence warning) -> `Loading` (ProgressRing) -> `Result` (text + copy) | `Error`
 
+`MainViewModel.OnCurrentStateChanged` is the single place that mirrors the state outside the view model: it sets the tray icon (`MainWindow.SetTrayState`: red badge recording, blue badge transcribing) and shows the window on every `Error`. By default (`show_window_while_recording: false`) recording runs in **tray mode** and never opens the window on its own. Reason: the UI Automation fail-fast crash microsoft/microsoft-ui-xaml#11139 only hits visible WinUI windows; the tray icon is plain Win32.
+
 ### Threading Model
 
 - **UI thread**: WinUI 3 DispatcherQueue (main thread)
@@ -133,7 +135,7 @@ Pricing lives in `CostCalculator`, split into `MinutePricing` (duration-billed) 
 - UI language is English (labels, error messages, button text).
 - Transcription language is configurable and defaults to **Auto-detect** (`language: null`), which sends no language field at all. `LanguageHelper` maps between the display name and the ISO 639-1 code.
 - Main window is always-on-top via `OverlappedPresenter.IsAlwaysOnTop`, fixed at 600x500, and starts off-screen to avoid a visible flash.
-- Closing the window hides it to the tray; the tray menu's "Quit" exits the app. Tray menu: Toggle Recording, hotkey display (grayed), Microphone submenu, Settings, History, Quit.
+- Closing the window hides it to the tray (in window mode this also cancels a running recording, in tray mode the recording continues); the tray menu's "Quit" exits the app. Tray menu: Toggle Recording, hotkey display (grayed), Microphone submenu, Settings, History, Quit.
 - The hotkey format in config uses `+`-separated lowercase tokens (e.g., `ctrl+shift+e`).
 - Config path: `%APPDATA%\WhisperShroom\config.json`. The path and the snake_case keys (`api_key`, `device_name`, `auto_copy`) are inherited from the pre-WinUI Python version and kept compatible.
 - Optional prefix/suffix text is stored in the config and wrapped around the transcript when copying; each can be toggled off per result.
@@ -144,5 +146,5 @@ Pricing lives in `CostCalculator`, split into `MinutePricing` (duration-billed) 
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.12.0.0**
+- Current version: **1.13.0.0**
 - Bump the version with every release build / bug fix round, add a `CHANGELOG.md` entry, and tag the commit `v<version>` to trigger `.github/workflows/release.yml`.
