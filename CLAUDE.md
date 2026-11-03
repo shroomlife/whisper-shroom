@@ -40,6 +40,7 @@ src/WhisperShroom/WhisperShroom/
     AppState.cs           # Ready / Recording / Loading / Result / Error
     AppConfig.cs          # Config POCO, snake_case JSON keys
     AudioDevice.cs        # record (Id, Name)
+    HistoryPeriodSummary.cs  # SQL-aggregated totals for one month or day
     TranscriptionResult.cs   # API result + usage (tokens or duration)
     TranscriptionEntry.cs    # One history row
     WizardStep.cs         # ApiKey / Hotkey / AudioDevice / Features
@@ -48,7 +49,8 @@ src/WhisperShroom/WhisperShroom/
     AudioService.cs       # NAudio WasapiCapture @ 16 kHz mono 16-bit streamed to a WAV file,
                           #   RMS silence detection, plus a monitor capture for the wizard's level test
     TranscriptionService.cs  # HttpClient -> OpenAI audio API; splits >24 MB WAVs into chunks
-    HistoryService.cs     # SQLite persistence at %APPDATA%\WhisperShroom\history.db
+    HistoryService.cs     # SQLite persistence at %APPDATA%\WhisperShroom\history.db; month/day
+                          #   aggregates, per-day entries, search (contains_ci UDF), recovery
     HotkeyService.cs      # Win32 RegisterHotKey via CsWin32 P/Invoke
     NotificationService.cs   # AppNotificationManager toasts on completed transcription
     HallucinationFilter.cs   # Known German Whisper hallucination strings (Amara/ZDF/SWR subtitles etc.)
@@ -56,15 +58,15 @@ src/WhisperShroom/WhisperShroom/
     MainViewModel.cs      # State machine, recording lifecycle, pending-entry tracking
     SettingsViewModel.cs  # Settings logic, fetches available models from the API
     SetupWizardViewModel.cs  # First-run wizard, API key validation
-    HistoryViewModel.cs   # History grouping, search, delete, retry
-    MonthGroup.cs         # Month-grouped days with summary
-    DayGroup.cs           # Day-grouped entries with summary
+    HistoryViewModel.cs   # Async (thread pool) loads for the History window, delete, retry
+    MonthGroup.cs         # Month header (label + summary) from a HistoryPeriodSummary
+    DayGroup.cs           # Day header (label + summary) from a HistoryPeriodSummary
   Views/
     MainWindow.xaml       # Window shell (always-on-top, 600x500), tray icon, native context menu
     MainPage.xaml         # 5 state panels, visibility-bound to CurrentState
     SettingsWindow.xaml   # Settings (Window, not a ContentDialog)
     SetupWizardWindow.xaml   # First-run wizard
-    HistoryWindow.xaml    # History with collapsible month/day groups and search
+    HistoryWindow.xaml    # History: months load first, days/entries load on expand, search
     TextEditorWindow.xaml # Small reusable text editor, used for the prefix/suffix fields
   Helpers/
     TranscriptionModelHelper.cs  # Model whitelist, display names, default model
@@ -142,5 +144,5 @@ Pricing lives in `CostCalculator`, split into `MinutePricing` (duration-billed) 
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.11.0.0**
+- Current version: **1.12.0.0**
 - Bump the version with every release build / bug fix round, add a `CHANGELOG.md` entry, and tag the commit `v<version>` to trigger `.github/workflows/release.yml`.

@@ -13,13 +13,27 @@ using WhisperShroom.ViewModels;
 
 namespace WhisperShroom.Views;
 
+/// <summary>
+/// History window. Loading is lazy and asynchronous: the window opens immediately, month
+/// headers come from SQL aggregates, days load when a month is expanded and entries when a
+/// day is expanded. Everything is dropped when the window closes.
+///
+/// Every refresh increments <see cref="_generation"/>; async results that come back after a
+/// newer refresh (or after closing) are discarded instead of being rendered over newer data.
+/// </summary>
 public sealed partial class HistoryWindow : Window
 {
     private readonly AppWindow _appWindow;
     private readonly HistoryViewModel _viewModel = new();
     private readonly DispatcherQueue _dispatcher;
-    private DispatcherQueueTimer? _searchDebounceTimer;
+    private readonly DispatcherQueueTimer _searchDebounceTimer;
 
+    // Expansion state survives refreshes (new transcription, delete) while the window is open.
+    private readonly HashSet<string> _expandedMonths = new();
+    private readonly HashSet<DateTime> _expandedDays = new();
+
+    private int _generation;
+    private bool _closed;
 
     public HistoryWindow()
     {
@@ -59,7 +73,12 @@ public sealed partial class HistoryWindow : Window
         var y = (workArea.Height - windowHeight) / 2 + workArea.Y;
         _appWindow.Move(new Windows.Graphics.PointInt32(x, y));
 
-        BuildHistoryUI();
+        // One timer and one Tick handler for the whole window lifetime (debounce: restart on
+        // every keystroke, fire 250 ms after the last one).
+        _searchDebounceTimer = _dispatcher.CreateTimer();
+        _searchDebounceTimer.Interval = TimeSpan.FromMilliseconds(250);
+        _searchDebounceTimer.IsRepeating = false;
+        _searchDebounceTimer.Tick += (_, _) => _ = RefreshAsync();
 
         SearchBox.TextChanged += OnSearchTextChanged;
 
@@ -72,17 +91,20 @@ public sealed partial class HistoryWindow : Window
         HistoryPanel.AddHandler(UIElement.PointerWheelChangedEvent,
             new PointerEventHandler((_, e) => e.Handled = false), true);
 
-        // React to new transcriptions or deletions from other windows
+        // React to new transcriptions or deletions from this or other windows
         App.HistoryService.Changed += OnHistoryChanged;
-        _appWindow.Closing += OnClosing;
+        Closed += OnClosed;
+
+        _ = RefreshAsync();
     }
 
     private void OnHistoryChanged()
     {
+        // Raised on whichever thread changed the data.
         _dispatcher.TryEnqueue(() =>
         {
-            _viewModel.LoadHistory();
-            RebuildUI();
+            if (!_closed)
+                _ = RefreshAsync();
         });
     }
 
@@ -91,47 +113,90 @@ public sealed partial class HistoryWindow : Window
         if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
             return;
 
-        // Debounce: wait 250ms after last keystroke before filtering
-        _searchDebounceTimer?.Stop();
-        _searchDebounceTimer ??= _dispatcher.CreateTimer();
-        _searchDebounceTimer.Interval = TimeSpan.FromMilliseconds(250);
-        _searchDebounceTimer.IsRepeating = false;
-        _searchDebounceTimer.Tick += (_, _) =>
-        {
-            _viewModel.SearchQuery = sender.Text;
-            RebuildUI();
-        };
+        _searchDebounceTimer.Stop();
         _searchDebounceTimer.Start();
     }
 
-    private void RebuildUI()
+    private void OnClosed(object sender, WindowEventArgs args)
     {
-        if (_viewModel.HasSearchQuery)
-            BuildSearchResultsUI();
-        else
-            BuildHistoryUI();
-    }
-
-    private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
-    {
+        _closed = true;
+        _generation++;
         App.HistoryService.Changed -= OnHistoryChanged;
+        _searchDebounceTimer.Stop();
+        _expandedMonths.Clear();
+        _expandedDays.Clear();
+        HistoryPanel.Children.Clear();
     }
 
-    private void BuildHistoryUI()
+    /// <summary>Reloads month headers, or search results while a query is entered.</summary>
+    private async Task RefreshAsync()
+    {
+        var generation = ++_generation;
+        var query = SearchBox.Text.Trim();
+
+        try
+        {
+            if (query.Length > 0)
+            {
+                var (results, totalCount) = await _viewModel.SearchAsync(query);
+                if (generation == _generation)
+                    BuildSearchResultsUI(results, totalCount, query);
+            }
+            else
+            {
+                var months = await _viewModel.LoadMonthsAsync();
+                if (generation == _generation)
+                    BuildMonthsUI(months, generation);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (generation == _generation)
+                ShowLoadError(HistoryPanel, ex);
+        }
+    }
+
+    private void ShowContent(bool isEmpty)
+    {
+        LoadingRing.IsActive = false;
+        LoadingRing.Visibility = Visibility.Collapsed;
+        EmptyState.Visibility = isEmpty ? Visibility.Visible : Visibility.Collapsed;
+        HistoryScroller.Visibility = isEmpty ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void ShowLoadError(Panel target, Exception ex)
+    {
+        ShowContent(isEmpty: false);
+        target.Children.Clear();
+        target.Children.Add(new TextBlock
+        {
+            Text = $"Could not load history: {ex.Message}",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+            Margin = new Thickness(0, 8, 0, 8)
+        });
+    }
+
+    private static ProgressRing CreateInlineProgress() => new()
+    {
+        IsActive = true,
+        Width = 20,
+        Height = 20,
+        HorizontalAlignment = HorizontalAlignment.Left,
+        Margin = new Thickness(8, 6, 0, 6)
+    };
+
+    // --- Months -------------------------------------------------------------------------------
+
+    private void BuildMonthsUI(List<MonthGroup> months, int generation)
     {
         HistoryPanel.Children.Clear();
+        ShowContent(isEmpty: months.Count == 0);
 
-        if (_viewModel.IsEmpty)
-        {
-            EmptyState.Visibility = Visibility.Visible;
-            HistoryScroller.Visibility = Visibility.Collapsed;
+        if (months.Count == 0)
             return;
-        }
 
-        EmptyState.Visibility = Visibility.Collapsed;
-        HistoryScroller.Visibility = Visibility.Visible;
-
-        foreach (var monthGroup in _viewModel.MonthGroups)
+        foreach (var monthGroup in months)
         {
             var monthExpander = new Expander
             {
@@ -162,73 +227,28 @@ public sealed partial class HistoryWindow : Window
             });
             monthExpander.Header = monthHeader;
 
-            // Days inside the month
+            // Days are loaded on first expand.
             var daysPanel = new StackPanel { Spacing = 4 };
+            monthExpander.Content = daysPanel;
 
-            foreach (var dayGroup in monthGroup.Days)
+            var loaded = false;
+            void EnsureDaysLoaded()
             {
-                var dayExpander = new Expander
-                {
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                    IsExpanded = false,
-                    Margin = new Thickness(0, 0, 0, 2),
-                    Padding = new Thickness(0),
-                    ManipulationMode = ManipulationModes.System
-                };
-
-                // Day header
-                var dayHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-                dayHeader.Children.Add(new TextBlock
-                {
-                    Text = dayGroup.DateLabel,
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-                dayHeader.Children.Add(new TextBlock
-                {
-                    Text = dayGroup.DaySummary,
-                    Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
-                    VerticalAlignment = VerticalAlignment.Center,
-                    FontSize = 12
-                });
-                dayExpander.Header = dayHeader;
-
-                // Entries inside the day
-                var entriesPanel = new StackPanel { Spacing = 6, Margin = new Thickness(8, 6, 8, 0) };
-                foreach (var entry in dayGroup.Entries)
-                {
-                    entriesPanel.Children.Add(CreateEntryCard(entry));
-                }
-
-                // "Delete Day" button at the bottom of the day
-                var deleteDayButton = new Button
-                {
-                    Content = new StackPanel
-                    {
-                        Orientation = Orientation.Horizontal,
-                        Spacing = 8,
-                        Children =
-                        {
-                            new FontIcon { Glyph = "\uE74D", FontSize = 13 },
-                            new TextBlock { Text = "Delete this day" }
-                        }
-                    },
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Margin = new Thickness(0, 10, 0, 4),
-                    Padding = new Thickness(12, 6, 12, 6),
-                    Tag = dayGroup.Date
-                };
-                ToolTipService.SetToolTip(deleteDayButton, $"Delete all transcriptions from {dayGroup.DateLabel}");
-                deleteDayButton.Click += OnDeleteDay;
-                entriesPanel.Children.Add(deleteDayButton);
-
-                dayExpander.Content = entriesPanel;
-
-                daysPanel.Children.Add(dayExpander);
+                _expandedMonths.Add(monthGroup.Key);
+                if (loaded) return;
+                loaded = true;
+                _ = LoadDaysAsync(monthGroup, daysPanel, generation, onFailed: () => loaded = false);
             }
 
-            monthExpander.Content = daysPanel;
+            monthExpander.Expanding += (_, _) => EnsureDaysLoaded();
+            monthExpander.Collapsed += (_, _) => _expandedMonths.Remove(monthGroup.Key);
+
+            if (_expandedMonths.Contains(monthGroup.Key))
+            {
+                EnsureDaysLoaded();
+                monthExpander.IsExpanded = true;
+            }
+
             HistoryPanel.Children.Add(monthExpander);
         }
 
@@ -241,7 +261,7 @@ public sealed partial class HistoryWindow : Window
                 Spacing = 8,
                 Children =
                 {
-                    new FontIcon { Glyph = "\uE74D", FontSize = 14 },
+                    new FontIcon { Glyph = "", FontSize = 14 },
                     new TextBlock { Text = "Clear all history" }
                 }
             },
@@ -252,6 +272,134 @@ public sealed partial class HistoryWindow : Window
         ToolTipService.SetToolTip(clearAllButton, "Delete all transcriptions");
         clearAllButton.Click += OnClearAllHistory;
         HistoryPanel.Children.Add(clearAllButton);
+    }
+
+    // --- Days ---------------------------------------------------------------------------------
+
+    private async Task LoadDaysAsync(MonthGroup month, StackPanel daysPanel, int generation, Action onFailed)
+    {
+        daysPanel.Children.Clear();
+        daysPanel.Children.Add(CreateInlineProgress());
+
+        try
+        {
+            var days = await _viewModel.LoadDaysAsync(month.Year, month.Month);
+            if (generation != _generation)
+                return;
+
+            daysPanel.Children.Clear();
+            foreach (var dayGroup in days)
+                daysPanel.Children.Add(CreateDayExpander(dayGroup, generation));
+        }
+        catch (Exception ex)
+        {
+            if (generation != _generation)
+                return;
+            onFailed();
+            ShowLoadError(daysPanel, ex);
+        }
+    }
+
+    private Expander CreateDayExpander(DayGroup dayGroup, int generation)
+    {
+        var dayExpander = new Expander
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            IsExpanded = false,
+            Margin = new Thickness(0, 0, 0, 2),
+            Padding = new Thickness(0),
+            ManipulationMode = ManipulationModes.System
+        };
+
+        // Day header
+        var dayHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        dayHeader.Children.Add(new TextBlock
+        {
+            Text = dayGroup.DateLabel,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        dayHeader.Children.Add(new TextBlock
+        {
+            Text = dayGroup.DaySummary,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 12
+        });
+        dayExpander.Header = dayHeader;
+
+        // Entries are loaded on first expand.
+        var entriesPanel = new StackPanel { Spacing = 6, Margin = new Thickness(8, 6, 8, 0) };
+        dayExpander.Content = entriesPanel;
+
+        var loaded = false;
+        void EnsureEntriesLoaded()
+        {
+            _expandedDays.Add(dayGroup.Date);
+            if (loaded) return;
+            loaded = true;
+            _ = LoadEntriesAsync(dayGroup, entriesPanel, generation, onFailed: () => loaded = false);
+        }
+
+        dayExpander.Expanding += (_, _) => EnsureEntriesLoaded();
+        dayExpander.Collapsed += (_, _) => _expandedDays.Remove(dayGroup.Date);
+
+        if (_expandedDays.Contains(dayGroup.Date))
+        {
+            EnsureEntriesLoaded();
+            dayExpander.IsExpanded = true;
+        }
+
+        return dayExpander;
+    }
+
+    // --- Entries ------------------------------------------------------------------------------
+
+    private async Task LoadEntriesAsync(DayGroup dayGroup, StackPanel entriesPanel, int generation, Action onFailed)
+    {
+        entriesPanel.Children.Clear();
+        entriesPanel.Children.Add(CreateInlineProgress());
+
+        try
+        {
+            var entries = await _viewModel.LoadEntriesAsync(dayGroup.Date);
+            if (generation != _generation)
+                return;
+
+            entriesPanel.Children.Clear();
+            foreach (var entry in entries)
+                entriesPanel.Children.Add(CreateEntryCard(entry));
+
+            // "Delete Day" button at the bottom of the day
+            var deleteDayButton = new Button
+            {
+                Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 8,
+                    Children =
+                    {
+                        new FontIcon { Glyph = "", FontSize = 13 },
+                        new TextBlock { Text = "Delete this day" }
+                    }
+                },
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 10, 0, 4),
+                Padding = new Thickness(12, 6, 12, 6),
+                Tag = dayGroup.Date
+            };
+            ToolTipService.SetToolTip(deleteDayButton, $"Delete all transcriptions from {dayGroup.DateLabel}");
+            deleteDayButton.Click += OnDeleteDay;
+            entriesPanel.Children.Add(deleteDayButton);
+        }
+        catch (Exception ex)
+        {
+            if (generation != _generation)
+                return;
+            onFailed();
+            ShowLoadError(entriesPanel, ex);
+        }
     }
 
     private UIElement CreateEntryCard(TranscriptionEntry entry)
@@ -507,17 +655,15 @@ public sealed partial class HistoryWindow : Window
         return border;
     }
 
-    private void BuildSearchResultsUI()
+    // --- Search -------------------------------------------------------------------------------
+
+    private void BuildSearchResultsUI(List<TranscriptionEntry> results, int totalCount, string query)
     {
         HistoryPanel.Children.Clear();
-
-        var (results, totalCount) = _viewModel.SearchEntries();
+        ShowContent(isEmpty: false);
 
         if (totalCount == 0)
         {
-            EmptyState.Visibility = Visibility.Collapsed;
-            HistoryScroller.Visibility = Visibility.Visible;
-
             var noResults = new TextBlock
             {
                 Text = "No matching transcriptions found.",
@@ -528,9 +674,6 @@ public sealed partial class HistoryWindow : Window
             HistoryPanel.Children.Add(noResults);
             return;
         }
-
-        EmptyState.Visibility = Visibility.Collapsed;
-        HistoryScroller.Visibility = Visibility.Visible;
 
         var countText = totalCount > results.Count
             ? $"Showing {results.Count} of {totalCount} results"
@@ -547,7 +690,7 @@ public sealed partial class HistoryWindow : Window
 
         foreach (var entry in results)
         {
-            HistoryPanel.Children.Add(CreateSearchResultCard(entry, _viewModel.SearchQuery.Trim()));
+            HistoryPanel.Children.Add(CreateSearchResultCard(entry, query));
         }
     }
 
@@ -694,6 +837,10 @@ public sealed partial class HistoryWindow : Window
         }
     }
 
+    // --- Actions ------------------------------------------------------------------------------
+    // Writes go through HistoryService, whose Changed event refreshes this window. No handler
+    // rebuilds the UI itself, so every change causes exactly one refresh.
+
     private async void OnRetryEntry(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || button.Tag is not TranscriptionEntry entry)
@@ -709,8 +856,6 @@ public sealed partial class HistoryWindow : Window
             button.IsEnabled = true;
             ToolTipService.SetToolTip(button, "Retry transcription");
         }
-
-        RebuildUI();
     }
 
     private void OnCopyEntry(object sender, RoutedEventArgs e)
@@ -740,10 +885,7 @@ public sealed partial class HistoryWindow : Window
         var result = await dialog.ShowAsync();
 
         if (result == ContentDialogResult.Primary)
-        {
             _viewModel.DeleteEntry(id);
-            RebuildUI();
-        }
     }
 
     private async void OnDeleteDay(object sender, RoutedEventArgs e)
@@ -769,8 +911,8 @@ public sealed partial class HistoryWindow : Window
 
         if (result == ContentDialogResult.Primary)
         {
+            _expandedDays.Remove(date);
             _viewModel.DeleteDay(date);
-            RebuildUI();
         }
     }
 
@@ -790,8 +932,9 @@ public sealed partial class HistoryWindow : Window
 
         if (result == ContentDialogResult.Primary)
         {
+            _expandedMonths.Clear();
+            _expandedDays.Clear();
             _viewModel.DeleteAll();
-            RebuildUI();
         }
     }
 }

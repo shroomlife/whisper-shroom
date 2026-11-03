@@ -1,70 +1,34 @@
-using System.Collections.ObjectModel;
-using CommunityToolkit.Mvvm.ComponentModel;
 using WhisperShroom.Helpers;
 using WhisperShroom.Models;
-using WhisperShroom.Services;
 
 namespace WhisperShroom.ViewModels;
 
-public partial class HistoryViewModel : ObservableObject
+/// <summary>
+/// Data access for the History window. Every read runs on the thread pool so the window
+/// opens immediately and the UI thread only builds what the user actually expanded.
+/// Writes go through <see cref="Services.HistoryService"/>, whose Changed event is the single
+/// trigger for the window to refresh; no method here reloads on its own.
+/// </summary>
+public sealed class HistoryViewModel
 {
-    public ObservableCollection<MonthGroup> MonthGroups { get; } = new();
+    /// <summary>Same cap as before: Inlines disable the TextBlock fast path, so keep it small.</summary>
+    public const int MaxSearchResults = 100;
 
-    [ObservableProperty]
-    public partial bool IsEmpty { get; set; }
+    public Task<List<MonthGroup>> LoadMonthsAsync() =>
+        Task.Run(() => App.HistoryService.GetMonthSummaries()
+            .Select(s => new MonthGroup(s))
+            .ToList());
 
-    [ObservableProperty]
-    public partial string SearchQuery { get; set; } = "";
+    public Task<List<DayGroup>> LoadDaysAsync(int year, int month) =>
+        Task.Run(() => App.HistoryService.GetDaySummaries(year, month)
+            .Select(s => new DayGroup(s))
+            .ToList());
 
-    public HistoryViewModel()
-    {
-        LoadHistory();
-    }
+    public Task<List<TranscriptionEntry>> LoadEntriesAsync(DateTime day) =>
+        Task.Run(() => App.HistoryService.GetEntriesForDay(day));
 
-    public bool HasSearchQuery => !string.IsNullOrWhiteSpace(SearchQuery);
-
-    /// <summary>
-    /// Returns entries matching the current search query (case-insensitive).
-    /// </summary>
-    public (List<TranscriptionEntry> Results, int TotalCount) SearchEntries()
-    {
-        if (!HasSearchQuery) return ([], 0);
-
-        var query = SearchQuery.Trim();
-        var all = App.HistoryService.GetAllEntries()
-            .Where(e => !e.IsPending && e.Text.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        // Cap displayed results to keep UI responsive (Inlines disable TextBlock fast-path)
-        const int maxResults = 100;
-        return (all.Take(maxResults).ToList(), all.Count);
-    }
-
-    public void LoadHistory()
-    {
-        MonthGroups.Clear();
-
-        var entries = App.HistoryService.GetAllEntries();
-
-        // Group by month, then by day within each month
-        var months = entries
-            .GroupBy(e => new { e.Timestamp.LocalDateTime.Year, e.Timestamp.LocalDateTime.Month })
-            .OrderByDescending(g => g.Key.Year)
-            .ThenByDescending(g => g.Key.Month);
-
-        foreach (var monthGroup in months)
-        {
-            var dayGroups = monthGroup
-                .GroupBy(e => e.Timestamp.LocalDateTime.Date)
-                .OrderByDescending(g => g.Key)
-                .Select(g => new DayGroup(g.Key, g.ToList()))
-                .ToList();
-
-            MonthGroups.Add(new MonthGroup(monthGroup.Key.Year, monthGroup.Key.Month, dayGroups));
-        }
-
-        IsEmpty = MonthGroups.Count == 0;
-    }
+    public Task<(List<TranscriptionEntry> Results, int TotalCount)> SearchAsync(string query) =>
+        Task.Run(() => App.HistoryService.SearchEntries(query, MaxSearchResults));
 
     public async Task<bool> RetryEntryAsync(TranscriptionEntry entry)
     {
@@ -85,25 +49,12 @@ public partial class HistoryViewModel : ObservableObject
         var outcome = await TranscriptionWorkflow.RunPendingAsync(
             entry.Id, entry.AudioPath, apiKey, language, model);
 
-        LoadHistory();
         return outcome.Kind == TranscriptionWorkflow.OutcomeKind.Success;
     }
 
-    public void DeleteEntry(string id)
-    {
-        App.HistoryService.DeleteEntry(id);
-        LoadHistory();
-    }
+    public void DeleteEntry(string id) => App.HistoryService.DeleteEntry(id);
 
-    public void DeleteDay(DateTime date)
-    {
-        App.HistoryService.DeleteEntriesByDate(date);
-        LoadHistory();
-    }
+    public void DeleteDay(DateTime date) => App.HistoryService.DeleteEntriesByDate(date);
 
-    public void DeleteAll()
-    {
-        App.HistoryService.DeleteAllEntries();
-        LoadHistory();
-    }
+    public void DeleteAll() => App.HistoryService.DeleteAllEntries();
 }

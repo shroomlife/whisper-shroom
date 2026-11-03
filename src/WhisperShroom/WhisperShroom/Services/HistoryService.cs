@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using WhisperShroom.Helpers;
 using WhisperShroom.Models;
@@ -91,32 +92,6 @@ public sealed class HistoryService
             cmd.CommandText = "ALTER TABLE transcriptions ADD COLUMN error_message TEXT";
             cmd.ExecuteNonQuery();
         }
-    }
-
-    public void AddEntry(TranscriptionResult result, string? model, string? language)
-    {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            INSERT INTO transcriptions (id, timestamp, text, model, language, usage_type, input_tokens, audio_tokens, output_tokens, duration_seconds, status)
-            VALUES (@id, @timestamp, @text, @model, @language, @usageType, @inputTokens, @audioTokens, @outputTokens, @durationSeconds, 'completed')
-            """;
-
-        command.Parameters.AddWithValue("@id", Guid.NewGuid().ToString());
-        command.Parameters.AddWithValue("@timestamp", DateTimeOffset.Now.ToString("o"));
-        command.Parameters.AddWithValue("@text", result.Text);
-        command.Parameters.AddWithValue("@model", (object?)model ?? DBNull.Value);
-        command.Parameters.AddWithValue("@language", (object?)language ?? DBNull.Value);
-        command.Parameters.AddWithValue("@usageType", (object?)result.UsageType ?? DBNull.Value);
-        command.Parameters.AddWithValue("@inputTokens", (object?)result.InputTokens ?? DBNull.Value);
-        command.Parameters.AddWithValue("@audioTokens", (object?)result.AudioTokens ?? DBNull.Value);
-        command.Parameters.AddWithValue("@outputTokens", (object?)result.OutputTokens ?? DBNull.Value);
-        command.Parameters.AddWithValue("@durationSeconds", (object?)result.DurationSeconds ?? DBNull.Value);
-
-        command.ExecuteNonQuery();
-        Changed?.Invoke();
     }
 
     public string AddPendingEntry(string audioPath, string? model, string? language, string errorMessage)
@@ -253,18 +228,184 @@ public sealed class HistoryService
         Changed?.Invoke();
     }
 
-    public List<TranscriptionEntry> GetAllEntries()
+    // --- Read side for the History window ---------------------------------------------------
+    //
+    // Periods are derived with SQLite's 'localtime' modifier, the same rule DeleteEntriesByDate
+    // already relies on, so a day's header, its entries and "Delete this day" always agree.
+
+    private const string EntryColumns =
+        "id, timestamp, text, model, language, usage_type, input_tokens, audio_tokens, output_tokens, duration_seconds, status, audio_path, error_message";
+
+    // Per period, model and usage type. Cost is computed in C# by CostCalculator (single source
+    // of pricing) from the summed usage; the cost_* sums mirror CalculateCostEur's per-entry
+    // rules: completed entries only, token billing requires input_tokens to be present.
+    private const string UsageAggregateColumns = """
+        model, usage_type,
+        COUNT(*) AS entry_count,
+        SUM(status = 'pending') AS pending_count,
+        SUM(CASE WHEN status = 'completed' AND usage_type = 'tokens'
+                 THEN COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) ELSE 0 END) AS total_tokens,
+        SUM(CASE WHEN status = 'completed' AND usage_type = 'duration'
+                 THEN COALESCE(duration_seconds, 0) ELSE 0 END) AS duration_seconds,
+        SUM(CASE WHEN status = 'completed' AND usage_type = 'tokens' AND input_tokens IS NOT NULL
+                 THEN input_tokens ELSE 0 END) AS cost_input_tokens,
+        SUM(CASE WHEN status = 'completed' AND usage_type = 'tokens' AND input_tokens IS NOT NULL
+                 THEN COALESCE(output_tokens, 0) ELSE 0 END) AS cost_output_tokens
+        """;
+
+    /// <summary>One summary per local month, newest first.</summary>
+    public List<HistoryPeriodSummary> GetMonthSummaries()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        var dayCounts = new Dictionary<string, int>();
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                SELECT strftime('%Y-%m', timestamp, 'localtime') AS period,
+                       COUNT(DISTINCT date(timestamp, 'localtime'))
+                FROM transcriptions
+                GROUP BY period
+                """;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                dayCounts[reader.GetString(0)] = reader.GetInt32(1);
+        }
+
+        using var aggregate = connection.CreateCommand();
+        aggregate.CommandText = $"""
+            SELECT strftime('%Y-%m', timestamp, 'localtime') AS period, {UsageAggregateColumns}
+            FROM transcriptions
+            GROUP BY period, model, usage_type
+            """;
+
+        return ReadPeriodSummaries(aggregate, "yyyy-MM", dayCounts);
+    }
+
+    /// <summary>One summary per local day of the given month, newest first.</summary>
+    public List<HistoryPeriodSummary> GetDaySummaries(int year, int month)
     {
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT id, timestamp, text, model, language, usage_type, input_tokens, audio_tokens, output_tokens, duration_seconds, status, audio_path, error_message
+        command.CommandText = $"""
+            SELECT date(timestamp, 'localtime') AS period, {UsageAggregateColumns}
             FROM transcriptions
+            WHERE strftime('%Y-%m', timestamp, 'localtime') = @month
+            GROUP BY period, model, usage_type
+            """;
+        command.Parameters.AddWithValue("@month", $"{year:D4}-{month:D2}");
+
+        return ReadPeriodSummaries(command, "yyyy-MM-dd", dayCounts: null);
+    }
+
+    /// <summary>All entries of one local day, newest first.</summary>
+    public List<TranscriptionEntry> GetEntriesForDay(DateTime date)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT {EntryColumns}
+            FROM transcriptions
+            WHERE date(timestamp, 'localtime') = @date
             ORDER BY timestamp DESC
             """;
+        command.Parameters.AddWithValue("@date", date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 
+        return ReadEntries(command);
+    }
+
+    /// <summary>
+    /// Completed entries whose text contains <paramref name="query"/>, newest first, capped at
+    /// <paramref name="limit"/>, plus the total number of matches.
+    /// </summary>
+    public (List<TranscriptionEntry> Results, int TotalCount) SearchEntries(string query, int limit)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        // SQLite's LIKE is case-insensitive for ASCII only ("Ä" would not match "ä"). A
+        // registered C# function keeps the exact OrdinalIgnoreCase semantics the in-memory
+        // search had, while the filtering and the cap still happen inside the query.
+        connection.CreateFunction(
+            "contains_ci",
+            (string text, string value) => text.Contains(value, StringComparison.OrdinalIgnoreCase),
+            isDeterministic: true);
+
+        int totalCount;
+        using (var count = connection.CreateCommand())
+        {
+            count.CommandText = """
+                SELECT COUNT(*) FROM transcriptions
+                WHERE status = 'completed' AND contains_ci(text, @query)
+                """;
+            count.Parameters.AddWithValue("@query", query);
+            totalCount = Convert.ToInt32(count.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT {EntryColumns}
+            FROM transcriptions
+            WHERE status = 'completed' AND contains_ci(text, @query)
+            ORDER BY timestamp DESC
+            LIMIT @limit
+            """;
+        command.Parameters.AddWithValue("@query", query);
+        command.Parameters.AddWithValue("@limit", limit);
+
+        return (ReadEntries(command), totalCount);
+    }
+
+    private static List<HistoryPeriodSummary> ReadPeriodSummaries(
+        SqliteCommand command, string periodFormat, Dictionary<string, int>? dayCounts)
+    {
+        var periods = new Dictionary<string, (int Entries, int Pending, long Tokens, long Seconds, decimal Cost)>();
+
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var period = reader.GetString(0);
+                var model = reader.IsDBNull(1) ? null : reader.GetString(1);
+                var usageType = reader.IsDBNull(2) ? null : reader.GetString(2);
+                var durationSeconds = reader.GetInt64(6);
+
+                var cost = CostCalculator.CalculateCostEur(
+                    model, usageType,
+                    inputTokens: reader.GetInt64(7),
+                    outputTokens: reader.GetInt64(8),
+                    durationSeconds: durationSeconds) ?? 0m;
+
+                periods.TryGetValue(period, out var acc);
+                periods[period] = (
+                    acc.Entries + reader.GetInt32(3),
+                    acc.Pending + reader.GetInt32(4),
+                    acc.Tokens + reader.GetInt64(5),
+                    acc.Seconds + durationSeconds,
+                    acc.Cost + cost);
+            }
+        }
+
+        return periods
+            .Select(p => new HistoryPeriodSummary(
+                DateTime.ParseExact(p.Key, periodFormat, CultureInfo.InvariantCulture),
+                p.Value.Entries,
+                p.Value.Pending,
+                dayCounts?.GetValueOrDefault(p.Key) ?? 1,
+                p.Value.Tokens,
+                p.Value.Seconds,
+                p.Value.Cost))
+            .OrderByDescending(s => s.PeriodStart)
+            .ToList();
+    }
+
+    private static List<TranscriptionEntry> ReadEntries(SqliteCommand command)
+    {
         var entries = new List<TranscriptionEntry>();
         using var reader = command.ExecuteReader();
 
@@ -273,7 +414,7 @@ public sealed class HistoryService
             entries.Add(new TranscriptionEntry
             {
                 Id = reader.GetString(0),
-                Timestamp = DateTimeOffset.Parse(reader.GetString(1)),
+                Timestamp = DateTimeOffset.Parse(reader.GetString(1), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
                 Text = reader.GetString(2),
                 Model = reader.IsDBNull(3) ? "" : reader.GetString(3),
                 Language = reader.IsDBNull(4) ? null : reader.GetString(4),
@@ -314,7 +455,7 @@ public sealed class HistoryService
 
         using var command = connection.CreateCommand();
         command.CommandText = "DELETE FROM transcriptions WHERE date(timestamp, 'localtime') = @date";
-        command.Parameters.AddWithValue("@date", date.ToString("yyyy-MM-dd"));
+        command.Parameters.AddWithValue("@date", date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         command.ExecuteNonQuery();
         Changed?.Invoke();
     }
@@ -355,7 +496,7 @@ public sealed class HistoryService
 
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT audio_path FROM transcriptions WHERE date(timestamp, 'localtime') = @date AND audio_path IS NOT NULL";
-        command.Parameters.AddWithValue("@date", date.ToString("yyyy-MM-dd"));
+        command.Parameters.AddWithValue("@date", date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         using var reader = command.ExecuteReader();
         while (reader.Read())
             TryDeleteFile(reader.GetString(0));

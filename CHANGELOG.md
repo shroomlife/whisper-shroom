@@ -2,6 +2,18 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.12.0.0] - 2026-11-03
+
+### Changed
+- **History opens instantly**: The window used to load all entries twice (once in the view model, once in the window) and build a card for every single entry, including all collapsed ones, before it appeared. With about 3,000 entries that meant tens of thousands of UI elements. The window now opens immediately with a progress ring, month headers come from SQL aggregates, a month's days load when it is expanded and a day's entries when the day is expanded. Everything is released when the window closes.
+- **Totals computed in SQL**: Month and day headers (entries, days, pending, tokens, audio seconds, cost) are aggregated by SQLite per model and usage type, and `CostCalculator` stays the only place that knows prices. Verified against the previous per-entry calculation on a real history: identical entries, days and cost for every month.
+- **Search runs in the database**: Matching and the 100-result cap happen inside the query instead of loading every entry. A registered `contains_ci` function keeps the exact case-insensitive comparison the in-memory search used (SQLite's own `LIKE` only folds ASCII, so "Ä" would not match "ä").
+- **Targeted refresh**: A new transcription, retry or delete refreshes the headers and reloads only the sections that are expanded, keeping them open. Previously every change rebuilt the whole history, and delete handlers rebuilt it a second time on top of the change notification.
+
+### Fixed
+- **Search debounce leaked handlers**: Every keystroke attached another `Tick` handler to the debounce timer, so a long query rebuilt the results once per typed character. The handler is now attached once.
+- **Late results**: A slow load that finished after a newer refresh, a new search or closing the window could render stale data. Each refresh carries a generation number and outdated results are discarded.
+
 ## [1.11.0.0] - 2026-11-03
 
 ### Fixed

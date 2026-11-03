@@ -23,15 +23,16 @@ internal static class CostCalculator
     };
 
     /// <summary>
-    /// Calculates the estimated cost in EUR for a transcription.
+    /// Calculates the estimated cost in EUR for one transcription, or for the summed usage
+    /// of several transcriptions of the same model and usage type (hence <see cref="long"/>).
     /// Returns null if pricing data is unavailable for the model.
     /// </summary>
     public static decimal? CalculateCostEur(
         string? model,
         string? usageType,
-        int? inputTokens,
-        int? outputTokens,
-        int? durationSeconds)
+        long? inputTokens,
+        long? outputTokens,
+        long? durationSeconds)
     {
         if (model is null) return null;
 
