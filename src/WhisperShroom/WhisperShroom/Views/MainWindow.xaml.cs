@@ -19,7 +19,14 @@ public sealed partial class MainWindow : Window
     private System.Drawing.Icon? _iconReady;
     private System.Drawing.Icon? _iconRecording;
     private System.Drawing.Icon? _iconTranscribing;
+    private System.Drawing.Icon? _iconDone;
     private Models.AppState _trayState = Models.AppState.Ready;
+
+    // After a transcription the tray briefly shows its outcome (green success, red error)
+    // before returning to the normal icon, so tray mode gives visible feedback even with
+    // notifications turned off.
+    private static readonly TimeSpan OutcomeBadgeDuration = TimeSpan.FromSeconds(5);
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _outcomeBadgeTimer;
 
     private const int WindowWidth = 600;
     private const int WindowHeight = 500;
@@ -85,6 +92,16 @@ public sealed partial class MainWindow : Window
         _iconReady = LoadTrayIcon("icon.ico");
         _iconRecording = LoadTrayIcon("icon-recording.ico");
         _iconTranscribing = LoadTrayIcon("icon-transcribing.ico");
+        _iconDone = LoadTrayIcon("icon-done.ico");
+
+        _outcomeBadgeTimer = DispatcherQueue.CreateTimer();
+        _outcomeBadgeTimer.Interval = OutcomeBadgeDuration;
+        _outcomeBadgeTimer.IsRepeating = false;
+        _outcomeBadgeTimer.Tick += (_, _) =>
+        {
+            if (_trayState is Models.AppState.Result or Models.AppState.Error && _iconReady is not null)
+                _trayIcon?.UpdateIcon(_iconReady);
+        };
 
         _trayIcon = new TaskbarIcon
         {
@@ -250,15 +267,27 @@ public sealed partial class MainWindow : Window
         if (_trayIcon is null)
             return;
 
+        _outcomeBadgeTimer?.Stop();
+
+        // Red while recording, yellow while transcribing; then green (success) or red (error)
+        // for OutcomeBadgeDuration before the normal icon returns.
         var icon = state switch
         {
             Models.AppState.Recording => _iconRecording,
             Models.AppState.Loading => _iconTranscribing,
+            Models.AppState.Result => _iconDone,
+            Models.AppState.Error => _iconRecording,
             _ => _iconReady
         };
 
+        if (state is Models.AppState.Result or Models.AppState.Error)
+            _outcomeBadgeTimer?.Start();
+
+        // UpdateIcon swaps the shell icon without touching the Icon property. Assigning the
+        // property instead would make H.NotifyIcon dispose the previous value
+        // (OnIconChanged: oldValue?.Dispose()), destroying the cached icons this window reuses.
         if (icon is not null)
-            _trayIcon.Icon = icon;
+            _trayIcon.UpdateIcon(icon);
 
         UpdateTrayTooltip();
     }
@@ -273,6 +302,10 @@ public sealed partial class MainWindow : Window
         {
             Models.AppState.Recording => $"WhisperShroom: Recording... ({hotkey} to stop)",
             Models.AppState.Loading => "WhisperShroom: Transcribing...",
+            Models.AppState.Result when App.ConfigService.Config.AutoCopyEnabled =>
+                $"WhisperShroom: Done, copied to clipboard ({hotkey})",
+            Models.AppState.Result => $"WhisperShroom: Done ({hotkey})",
+            Models.AppState.Error => $"WhisperShroom: Failed, see window ({hotkey})",
             _ => $"WhisperShroom ({hotkey})"
         };
     }
@@ -326,6 +359,8 @@ public sealed partial class MainWindow : Window
         _iconReady?.Dispose();
         _iconRecording?.Dispose();
         _iconTranscribing?.Dispose();
+        _iconDone?.Dispose();
+        _outcomeBadgeTimer?.Stop();
         _appWindow.Closing -= OnClosing;
         this.Close();
     }

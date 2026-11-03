@@ -2,10 +2,20 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.13.2.0] - 2026-11-03
+
+1.13.0.0 and 1.13.1.0 were local test builds and were not released; this version supersedes them.
+
+### Fixed
+- **Tray icon crash after the first transcription**: The tray state icons are loaded once and reused, but assigning `TaskbarIcon.Icon` makes H.NotifyIcon dispose the previous icon (`OnIconChanged` calls `oldValue?.Dispose()`). Switching back to an already used icon then failed with "Cannot access a disposed object. Object name: 'Icon'", which also skipped the clipboard copy and the notification after the transcription had been saved. The state icons are now applied with H.NotifyIcon's `UpdateIcon`, which changes the shell icon without replacing (and disposing) the property value.
+
+### Added
+- **Outcome feedback in tray mode**: The tray icon now works like a traffic light: red while recording, yellow while transcribing, then green for five seconds after a successful transcription or red for five seconds after an error, before the normal icon returns. The tooltip says what happened ("Done, copied to clipboard" or "Failed, see window"). This gives visible feedback in tray mode even with notifications turned off. Errors still open the window with Retry.
+
 ## [1.13.0.0] - 2026-11-03
 
 ### Added
-- **Tray mode (default)**: Recording no longer opens the window. The tray icon shows the state instead: a red badge while recording, a blue badge while transcribing, and the tooltip says what is happening and which hotkey stops the recording. The result lands on the clipboard and in the notification as before. The window opens automatically on any error (with Retry), and clicking the tray icon still works as before.
+- **Tray mode (default)**: Recording no longer opens the window. The tray icon shows the state instead: a red badge while recording, a yellow badge while transcribing, and the tooltip says what is happening and which hotkey stops the recording. The result lands on the clipboard and in the notification as before. The window opens automatically on any error (with Retry), and clicking the tray icon still works as before.
 - **Setting "Show window while recording"**: Restores the previous behavior where the window opens for every recording. Stored as `show_window_while_recording`, off by default.
 
 ### Changed
