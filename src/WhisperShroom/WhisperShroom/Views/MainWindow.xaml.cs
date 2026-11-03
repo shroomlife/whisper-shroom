@@ -5,6 +5,8 @@ using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using WhisperShroom.Helpers;
+using Windows.Win32;
+using Windows.Win32.UI.WindowsAndMessaging;
 using WinRT.Interop;
 
 namespace WhisperShroom.Views;
@@ -20,6 +22,7 @@ public sealed partial class MainWindow : Window
     private System.Drawing.Icon? _iconRecording;
     private System.Drawing.Icon? _iconTranscribing;
     private System.Drawing.Icon? _iconDone;
+    private System.Drawing.Icon? _iconError;
     private Models.AppState _trayState = Models.AppState.Ready;
 
     // After a transcription the tray briefly shows its outcome (green success, red error)
@@ -77,22 +80,37 @@ public sealed partial class MainWindow : Window
         _appWindow.Closing += OnClosing;
     }
 
-    private static System.Drawing.Icon? LoadTrayIcon(string fileName)
+    /// <summary>
+    /// Loads the image of an .ico that matches the notification area's icon size. Icon(Stream)
+    /// alone returns the smallest image (16 px), which the shell would upscale on scaled
+    /// displays. The tray uses the system small icon size (SM_CXSMICON: 16/20/24/32/40 px at
+    /// 100-250 %), queried for the system DPI, i.e. the primary monitor where the
+    /// notification area lives. The .ico files contain all of these sizes.
+    /// </summary>
+    private static System.Drawing.Icon? LoadTrayIcon(string fileName, int size)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Assets", fileName);
         if (!File.Exists(path))
             return null;
 
         using var stream = File.OpenRead(path);
-        return new System.Drawing.Icon(stream);
+        return new System.Drawing.Icon(stream, size, size);
+    }
+
+    private static int GetTrayIconSize()
+    {
+        var size = PInvoke.GetSystemMetricsForDpi(SYSTEM_METRICS_INDEX.SM_CXSMICON, PInvoke.GetDpiForSystem());
+        return size > 0 ? size : 16;
     }
 
     private void SetupTrayIcon()
     {
-        _iconReady = LoadTrayIcon("icon.ico");
-        _iconRecording = LoadTrayIcon("icon-recording.ico");
-        _iconTranscribing = LoadTrayIcon("icon-transcribing.ico");
-        _iconDone = LoadTrayIcon("icon-done.ico");
+        var size = GetTrayIconSize();
+        _iconReady = LoadTrayIcon("icon-tray.ico", size);
+        _iconRecording = LoadTrayIcon("icon-recording.ico", size);
+        _iconTranscribing = LoadTrayIcon("icon-transcribing.ico", size);
+        _iconDone = LoadTrayIcon("icon-done.ico", size);
+        _iconError = LoadTrayIcon("icon-error.ico", size);
 
         _outcomeBadgeTimer = DispatcherQueue.CreateTimer();
         _outcomeBadgeTimer.Interval = OutcomeBadgeDuration;
@@ -269,14 +287,15 @@ public sealed partial class MainWindow : Window
 
         _outcomeBadgeTimer?.Stop();
 
-        // Red while recording, yellow while transcribing; then green (success) or red (error)
+        // Red dot while recording, yellow while transcribing; then green (success) or the
+        // standard red error overlay with a white x
         // for OutcomeBadgeDuration before the normal icon returns.
         var icon = state switch
         {
             Models.AppState.Recording => _iconRecording,
             Models.AppState.Loading => _iconTranscribing,
             Models.AppState.Result => _iconDone,
-            Models.AppState.Error => _iconRecording,
+            Models.AppState.Error => _iconError,
             _ => _iconReady
         };
 
@@ -360,6 +379,7 @@ public sealed partial class MainWindow : Window
         _iconRecording?.Dispose();
         _iconTranscribing?.Dispose();
         _iconDone?.Dispose();
+        _iconError?.Dispose();
         _outcomeBadgeTimer?.Stop();
         _appWindow.Closing -= OnClosing;
         this.Close();

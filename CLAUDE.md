@@ -49,7 +49,7 @@ src/WhisperShroom/WhisperShroom/
     AudioService.cs       # NAudio WasapiCapture @ 16 kHz mono 16-bit streamed to a WAV file,
                           #   RMS silence detection, plus a monitor capture for the wizard's level test
     TranscriptionService.cs  # HttpClient -> OpenAI audio API; splits >24 MB WAVs into chunks
-    HistoryService.cs     # SQLite persistence at %APPDATA%\WhisperShroom\history.db; month/day
+    HistoryService.cs     # SQLite (WAL) at %APPDATA%\WhisperShroom\history.db; month/day
                           #   aggregates, per-day entries, search (contains_ci UDF), recovery
     HotkeyService.cs      # Win32 RegisterHotKey via CsWin32 P/Invoke
     NotificationService.cs   # AppNotificationManager toasts on completed transcription
@@ -101,7 +101,7 @@ Target framework is `net10.0-windows10.0.26100.0` with `TargetPlatformMinVersion
 `AppState` drives UI visibility via `x:Bind` across the five panels in `MainPage.xaml`:
 `Ready` -> `Recording` (timer, pulsing dot, silence warning) -> `Loading` (ProgressRing) -> `Result` (text + copy) | `Error`
 
-`MainViewModel.OnCurrentStateChanged` is the single place that mirrors the state outside the view model: it sets the tray icon (`MainWindow.SetTrayState` via H.NotifyIcon `UpdateIcon`, never by assigning `Icon`, which disposes the old value: red badge recording, yellow badge transcribing, then 5 s green on success or red on error) and shows the window on every `Error`. By default (`show_window_while_recording: false`) recording runs in **tray mode** and never opens the window on its own. Reason: the UI Automation fail-fast crash microsoft/microsoft-ui-xaml#11139 only hits visible WinUI windows; the tray icon is plain Win32.
+`MainViewModel.OnCurrentStateChanged` is the single place that mirrors the state outside the view model: it sets the tray icon (`MainWindow.SetTrayState` via H.NotifyIcon `UpdateIcon`, never by assigning `Icon`, which disposes the old value: red badge recording, yellow badge transcribing, then 5 s green on success or the standard red error overlay with a white x; icons are loaded at SM_CXSMICON for the system DPI) and shows the window on every `Error`. By default (`show_window_while_recording: false`) recording runs in **tray mode** and never opens the window on its own. Reason: the UI Automation fail-fast crash microsoft/microsoft-ui-xaml#11139 only hits visible WinUI windows; the tray icon is plain Win32.
 
 ### Threading Model
 
@@ -146,5 +146,5 @@ Pricing lives in `CostCalculator`, split into `MinutePricing` (duration-billed) 
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.13.2.0**
+- Current version: **1.13.3.0**
 - Bump the version with every release build / bug fix round, add a `CHANGELOG.md` entry, and tag the commit `v<version>` to trigger `.github/workflows/release.yml`.

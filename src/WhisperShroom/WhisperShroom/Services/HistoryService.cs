@@ -57,6 +57,16 @@ public sealed class HistoryService
             """;
         command.ExecuteNonQuery();
 
+        // Write-ahead logging lets the History window read on the thread pool while a
+        // transcription writes, instead of readers and the writer blocking each other.
+        // Recommended by the Microsoft.Data.Sqlite docs for concurrent access; the mode is
+        // stored in the database file, so setting it on every start is idempotent.
+        using (var wal = connection.CreateCommand())
+        {
+            wal.CommandText = "PRAGMA journal_mode = 'wal'";
+            wal.ExecuteNonQuery();
+        }
+
         // Migration: add columns if upgrading from older schema
         MigrateSchema(connection);
     }

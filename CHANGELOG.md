@@ -2,15 +2,20 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
-## [1.13.2.0] - 2026-11-03
+## [1.13.3.0] - 2026-11-03
 
-1.13.0.0 and 1.13.1.0 were local test builds and were not released; this version supersedes them.
+1.13.0.0 to 1.13.2.0 were local test builds and were not released; this version supersedes them.
 
 ### Fixed
 - **Tray icon crash after the first transcription**: The tray state icons are loaded once and reused, but assigning `TaskbarIcon.Icon` makes H.NotifyIcon dispose the previous icon (`OnIconChanged` calls `oldValue?.Dispose()`). Switching back to an already used icon then failed with "Cannot access a disposed object. Object name: 'Icon'", which also skipped the clipboard copy and the notification after the transcription had been saved. The state icons are now applied with H.NotifyIcon's `UpdateIcon`, which changes the shell icon without replacing (and disposing) the property value.
 
 ### Added
 - **Outcome feedback in tray mode**: The tray icon now works like a traffic light: red while recording, yellow while transcribing, then green for five seconds after a successful transcription or red for five seconds after an error, before the normal icon returns. The tooltip says what happened ("Done, copied to clipboard" or "Failed, see window"). This gives visible feedback in tray mode even with notifications turned off. Errors still open the window with Retry.
+
+### Changed
+- **Standard error overlay**: Errors use a red badge with a white "x", the overlay the Windows notification area guidelines prescribe for errors, so an error no longer looks like a running recording.
+- **Sharp tray icons on scaled displays**: `Icon(Stream)` returns the smallest image in an .ico (16 px), which the shell upscaled at 125 % and above. Tray icons are now loaded at the notification area's size (`GetSystemMetricsForDpi(SM_CXSMICON)` for the system DPI), and every tray icon ships 16, 20, 24, 32 and 40 px images as the guidelines ask for.
+- **SQLite write-ahead logging**: The history database switches to WAL, which Microsoft.Data.Sqlite recommends for concurrent access. Since the History window reads on the thread pool, a transcription finishing while it loads no longer has to wait for the reader or vice versa.
 
 ## [1.13.0.0] - 2026-11-03
 
