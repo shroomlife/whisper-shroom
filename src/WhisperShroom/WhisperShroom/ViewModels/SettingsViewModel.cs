@@ -158,12 +158,15 @@ public partial class SettingsViewModel : ObservableObject
 
         App.ConfigService.Save();
 
-        // Re-register hotkey
-        App.HotkeyService.Register(config.Hotkey, App.MainViewModel.ToggleRecording);
+        // Re-register hotkey. Windows rejects a combination another application already owns.
+        HotkeyRegistered = App.HotkeyService.Register(config.Hotkey, App.MainViewModel.ToggleRecording);
         App.MainViewModel.RefreshHotkeyDisplay();
 
         return true;
     }
+
+    /// <summary>Result of the hotkey registration performed by the last successful <see cref="Save"/>.</summary>
+    public bool HotkeyRegistered { get; private set; }
 
     private static string FormatPreview(string value) =>
         string.IsNullOrEmpty(value)

@@ -45,8 +45,8 @@ src/WhisperShroom/WhisperShroom/
     WizardStep.cs         # ApiKey / Hotkey / AudioDevice / Features
   Services/
     ConfigService.cs      # JSON config at %APPDATA%\WhisperShroom\config.json
-    AudioService.cs       # NAudio WasapiCapture @ 16 kHz mono 16-bit, RMS silence detection,
-                          #   plus a separate monitor capture for the wizard's mic level test
+    AudioService.cs       # NAudio WasapiCapture @ 16 kHz mono 16-bit streamed to a WAV file,
+                          #   RMS silence detection, plus a monitor capture for the wizard's level test
     TranscriptionService.cs  # HttpClient -> OpenAI audio API; splits >24 MB WAVs into chunks
     HistoryService.cs     # SQLite persistence at %APPDATA%\WhisperShroom\history.db
     HotkeyService.cs      # Win32 RegisterHotKey via CsWin32 P/Invoke
@@ -74,6 +74,7 @@ src/WhisperShroom/WhisperShroom/
     HotkeyParser.cs       # "ctrl+shift+e" -> Win32 modifier flags + VK code
     NativeMenu.cs         # Manual P/Invoke for Win32 popup menus (CreatePopupMenu, TrackPopupMenuEx)
     ClipboardHelper.cs    # Win32 clipboard P/Invoke
+    WavFileRepair.cs      # Fixes RIFF/data sizes of WAVs left behind by an interrupted recording
     AppInfo.cs            # Installed MSIX package version
 ```
 
@@ -101,13 +102,14 @@ Target framework is `net10.0-windows10.0.26100.0` with `TargetPlatformMinVersion
 ### Threading Model
 
 - **UI thread**: WinUI 3 DispatcherQueue (main thread)
-- **Hotkey listener**: dedicated background thread (`HotkeyListener`) with a Win32 `GetMessage` loop
-- **Audio capture**: NAudio callback thread, RMS computed per buffer
+- **Hotkey listener**: dedicated background thread (`HotkeyListener`) with a Win32 `GetMessage` loop; `Register` waits until its message queue exists (documented `PostThreadMessage` pattern)
+- **Audio capture**: NAudio capture thread is the only thread that touches the `WaveFileWriter` while recording. `WasapiCapture.StopRecording()` only signals; `AudioService.StopRecordingAsync` awaits `RecordingStopped` before finalizing the file
+- **Process priority**: the tray icon is created with `ForceCreate(enablesEfficiencyMode: false)`; H.NotifyIcon's default would pin the process to `IDLE_PRIORITY_CLASS` + EcoQoS
 - **Transcription**: `Task.Run` in `TranscriptionWorkflow` -> HttpClient async -> result dispatched to UI
 
 ### Transcription Flow
 
-Recordings are persisted to `%APPDATA%\WhisperShroom\audio\` and written to the DB as a **pending** entry *before* the API call, so nothing is lost on crash. On success the entry is completed and the WAV deleted; on failure the audio is kept and the entry stays retryable from the error panel or History. Silent recordings are never sent to the API. `TranscriptionWorkflow` is the single implementation shared by the main flow and the History retry.
+Recordings stream into `%APPDATA%\WhisperShroom\audio\` while recording (header refreshed every 2 s) and are written to the DB as a **pending** entry *before* the API call, so nothing is lost on crash. On start, `HistoryService.RecoverOrphanedRecordings` turns WAVs no entry references into pending entries (header repaired via `WavFileRepair`) and deletes empty ones. While `Loading`, the hotkey toggle is ignored. On success the entry is completed and the WAV deleted; on failure the audio is kept and the entry stays retryable from the error panel or History. Silent recordings are never sent to the API. `TranscriptionWorkflow` is the single implementation shared by the main flow and the History retry.
 
 ## Transcription Models
 
@@ -140,5 +142,5 @@ Pricing lives in `CostCalculator`, split into `MinutePricing` (duration-billed) 
 
 - Version is in `Package.appxmanifest` (`<Identity Version="..."/>`).
 - Format: `Major.Minor.Patch.0` (MSIX requires 4-part, last segment reserved by store = always 0).
-- Current version: **1.10.0.0**
+- Current version: **1.11.0.0**
 - Bump the version with every release build / bug fix round, add a `CHANGELOG.md` entry, and tag the commit `v<version>` to trigger `.github/workflows/release.yml`.

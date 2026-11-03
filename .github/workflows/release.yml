@@ -92,11 +92,13 @@ jobs:
       # The symbol package stays in the versioned subfolder; only the .msix is copied to
       # the dist/ root. Treated as optional like the certificate, because it is only
       # produced when the C++ tools are present to supply mspdbcmf.exe.
+      # Windows App SDK 1.x tooling named it .msixsym; the standalone MSIX tooling that
+      # ships with 2.x (Microsoft.Windows.SDK.BuildTools.MSIX) always writes .appxsym.
       - name: Find symbol package
         id: symbols
         shell: bash
         run: |
-          SYM=$(find dist/ -name "*.msixsym" -type f | head -1)
+          SYM=$(find dist/ -type f \( -name "*.appxsym" -o -name "*.msixsym" \) | head -1)
           if [ -n "$SYM" ]; then
             echo "sym_path=$SYM" >> "$GITHUB_OUTPUT"
             echo "sym_found=true" >> "$GITHUB_OUTPUT"
@@ -165,7 +167,7 @@ jobs:
       - name: Compose release notes
         run: |
           CER_NAME=$(find artifacts -maxdepth 1 -name '*.cer' -printf '%f\n' | head -1)
-          SYM_NAME=$(find artifacts -maxdepth 1 -name '*.msixsym' -printf '%f\n' | head -1)
+          SYM_NAME=$(find artifacts -maxdepth 1 \( -name '*.appxsym' -o -name '*.msixsym' \) -printf '%f\n' | head -1)
 
           cat > release-body.md <<'EOF'
           ## Installation

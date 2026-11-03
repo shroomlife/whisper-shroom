@@ -62,24 +62,36 @@ public partial class MainViewModel : ObservableObject
         ErrorMessage = "";
 
         _dispatcher = DispatcherQueue.GetForCurrentThread();
-        App.AudioService.RmsUpdated += OnRmsUpdated;
     }
 
+    /// <summary>
+    /// Hotkey / tray entry point (may be called from the hotkey thread). While a recording is
+    /// being transcribed the toggle is ignored, so a second recording can never overwrite the
+    /// pending entry the running transcription will resolve.
+    /// </summary>
     public void ToggleRecording()
     {
         _dispatcher.TryEnqueue(() =>
         {
-            if (CurrentState == AppState.Recording)
-                StopRecording();
-            else
-                StartRecording();
+            switch (CurrentState)
+            {
+                case AppState.Recording:
+                    StopRecording();
+                    break;
+                case AppState.Loading:
+                    break;
+                default:
+                    StartRecording();
+                    break;
+            }
         });
     }
 
     [RelayCommand]
     private void StartRecording()
     {
-        if (CurrentState == AppState.Recording) return;
+        // IsBusy: a cancelled recording may still be finishing on NAudio's capture thread.
+        if (CurrentState is AppState.Recording or AppState.Loading || App.AudioService.IsBusy) return;
 
         var config = App.ConfigService.Config;
 
@@ -94,16 +106,12 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            string? deviceId = null;
+            var deviceId = config.DeviceName is not null
+                ? App.AudioService.FindDeviceId(config.DeviceName)
+                : null;
 
-            if (config.DeviceName is not null)
-            {
-                var devices = App.AudioService.GetInputDevices();
-                var match = devices.FirstOrDefault(d => d.Name == config.DeviceName);
-                deviceId = match?.Id;
-            }
-
-            App.AudioService.StartRecording(deviceId);
+            var audioPath = Path.Combine(App.HistoryService.AudioDir, $"{Guid.NewGuid()}.wav");
+            App.AudioService.StartRecording(deviceId, audioPath);
             _silenceWarned = false;
             ShowSilenceWarning = false;
             _recordingStopwatch.Restart();
@@ -133,31 +141,40 @@ public partial class MainViewModel : ObservableObject
         if (CurrentState != AppState.Recording) return;
 
         StopTimer();
-        var wavData = App.AudioService.StopRecording();
 
-        // _hasAudio is only reset on the next StartRecording, so it's still valid here.
-        var hadAudio = App.AudioService.HasAudio;
+        // Loading from here on: the hotkey toggle ignores input until the state is resolved.
+        CurrentState = AppState.Loading;
 
-        if (wavData is null || wavData.Length == 0)
+        RecordingResult? recording;
+        try
+        {
+            recording = await App.AudioService.StopRecordingAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowSettingsOnError = false;
+            ErrorMessage = $"Could not finish recording: {ex.Message}";
+            CurrentState = AppState.Error;
+            return;
+        }
+
+        if (recording is null)
         {
             CurrentState = AppState.Ready;
             return;
         }
 
-        CurrentState = AppState.Loading;
-
         var config = App.ConfigService.Config;
         var language = config.Language;
         var model = config.Model ?? TranscriptionModelHelper.DefaultModelId;
 
-        // Persist the recording up front (crash-safe). Wrapped in try/catch because the
-        // async RelayCommand default is "await and rethrow" — an escaping IO exception
-        // (e.g. disk full) would otherwise crash the app.
+        // The WAV is already finalized on disk; register it as a pending entry before any
+        // API call so nothing is lost. Wrapped in try/catch because the async RelayCommand
+        // default is "await and rethrow", which would otherwise crash the app on a DB error.
         try
         {
-            var audioPath = SaveAudioFile(wavData);
-            _pendingEntryId = App.HistoryService.AddPendingEntry(audioPath, model, language, "");
-            _pendingAudioPath = audioPath;
+            _pendingEntryId = App.HistoryService.AddPendingEntry(recording.FilePath, model, language, "");
+            _pendingAudioPath = recording.FilePath;
             _pendingModel = model;
             _pendingLanguage = language;
         }
@@ -171,9 +188,21 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        // The capture device failed mid-recording (e.g. unplugged). What was captured up to
+        // that point is kept and can be retried.
+        if (recording.Error is not null)
+        {
+            var message = $"Recording stopped unexpectedly: {recording.Error.Message}";
+            App.HistoryService.UpdatePendingError(_pendingEntryId, message);
+            ShowSettingsOnError = false;
+            ErrorMessage = message;
+            CurrentState = AppState.Error;
+            return;
+        }
+
         // Skip the (billed) API call for truly silent recordings, but keep them persisted
         // so the user can still force a retry from the error panel or History.
-        if (!hadAudio)
+        if (!recording.HasAudio)
         {
             App.HistoryService.UpdatePendingError(_pendingEntryId!, TranscriptionWorkflow.NoSpeechMessage);
             ShowSettingsOnError = false;
@@ -267,24 +296,29 @@ public partial class MainViewModel : ObservableObject
         _pendingLanguage = null;
     }
 
-    private static string SaveAudioFile(byte[] wavData)
-    {
-        var audioPath = Path.Combine(App.HistoryService.AudioDir, $"{Guid.NewGuid()}.wav");
-        File.WriteAllBytes(audioPath, wavData);
-        return audioPath;
-    }
-
     private void StopRecording()
     {
         _ = StopRecordingAsync();
     }
 
     [RelayCommand]
-    private void CancelRecording()
+    private async Task CancelRecordingAsync()
     {
+        if (CurrentState != AppState.Recording) return;
+
         StopTimer();
-        App.AudioService.CancelRecording();
         CurrentState = AppState.Ready;
+
+        try
+        {
+            await App.AudioService.CancelRecordingAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowSettingsOnError = false;
+            ErrorMessage = $"Could not cancel recording: {ex.Message}";
+            CurrentState = AppState.Error;
+        }
     }
 
     [RelayCommand]
@@ -360,11 +394,6 @@ public partial class MainViewModel : ObservableObject
         {
             ShowSilenceWarning = false;
         }
-    }
-
-    private void OnRmsUpdated(float rms)
-    {
-        // RMS updates come from the audio thread, handled via timer on UI thread
     }
 
     private void StopTimer()

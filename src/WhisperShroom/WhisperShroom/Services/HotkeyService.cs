@@ -1,76 +1,99 @@
 using Windows.Win32;
 using Windows.Win32.UI.Input.KeyboardAndMouse;
+using Windows.Win32.UI.WindowsAndMessaging;
 using WhisperShroom.Helpers;
 
 namespace WhisperShroom.Services;
 
+/// <summary>
+/// Registers one global hotkey on a dedicated thread with its own Win32 message loop.
+/// All public members are called from the UI thread; the listener thread only reads
+/// values handed to it through its closure, so no field is shared across threads.
+/// </summary>
 public sealed class HotkeyService : IDisposable
 {
     private const int HotkeyId = 1;
     private const uint WM_HOTKEY = 0x0312;
     private const uint WM_QUIT = 0x0012;
+    private const uint WM_USER = 0x0400;
+
     private Thread? _thread;
     private uint _threadId;
-    private bool _registered;
-    private Action? _callback;
 
-    public bool IsRegistered => _registered;
+    public bool IsRegistered { get; private set; }
 
-    public void Register(string hotkeyStr, Action callback)
+    /// <summary>
+    /// Replaces any previous registration. Returns false if Windows rejected the hotkey,
+    /// typically because another application already owns the combination.
+    /// </summary>
+    public bool Register(string hotkeyStr, Action callback)
     {
         Unregister();
 
-        _callback = callback;
         var (modifiers, vkCode) = HotkeyParser.Parse(hotkeyStr);
 
-        _thread = new Thread(() => ListenLoop(modifiers, vkCode))
+        // PostThreadMessage requires the target thread to own a message queue. Following the
+        // documented pattern, the listener forces queue creation with PeekMessage and signals
+        // readiness before Register returns, so Unregister can always reach it.
+        using var ready = new ManualResetEventSlim(false);
+        uint threadId = 0;
+        var registered = false;
+
+        var thread = new Thread(() =>
+        {
+            threadId = PInvoke.GetCurrentThreadId();
+            PInvoke.PeekMessage(out _, default, WM_USER, WM_USER, PEEK_MESSAGE_REMOVE_TYPE.PM_NOREMOVE);
+            registered = PInvoke.RegisterHotKey(default, HotkeyId, (HOT_KEY_MODIFIERS)modifiers, vkCode);
+            ready.Set();
+
+            if (!registered)
+                return;
+
+            ListenLoop(callback);
+        })
         {
             IsBackground = true,
             Name = "HotkeyListener"
         };
-        _thread.Start();
-    }
 
-    private void ListenLoop(uint modifiers, uint vkCode)
-    {
-        _threadId = PInvoke.GetCurrentThreadId();
+        thread.Start();
+        ready.Wait();
 
-        var modFlags = (HOT_KEY_MODIFIERS)modifiers;
-        if (!PInvoke.RegisterHotKey(default, HotkeyId, modFlags, vkCode))
+        if (!registered)
         {
-            _registered = false;
-            return;
+            thread.Join();
+            IsRegistered = false;
+            return false;
         }
 
-        _registered = true;
+        _thread = thread;
+        _threadId = threadId;
+        IsRegistered = true;
+        return true;
+    }
 
+    private static void ListenLoop(Action callback)
+    {
         while (PInvoke.GetMessage(out var msg, default, 0, 0))
         {
             if (msg.message == WM_HOTKEY && msg.wParam == (nuint)HotkeyId)
-            {
-                _callback?.Invoke();
-            }
+                callback();
         }
 
         PInvoke.UnregisterHotKey(default, HotkeyId);
-        _registered = false;
     }
 
     public void Unregister()
     {
-        if (_threadId != 0)
-        {
-            PInvoke.PostThreadMessage(_threadId, WM_QUIT, 0, 0);
-            _threadId = 0;
-        }
+        if (_thread is null)
+            return;
 
-        if (_thread is not null)
-        {
-            _thread.Join(TimeSpan.FromSeconds(2));
-            _thread = null;
-        }
+        PInvoke.PostThreadMessage(_threadId, WM_QUIT, 0, 0);
+        _thread.Join();
 
-        _callback = null;
+        _thread = null;
+        _threadId = 0;
+        IsRegistered = false;
     }
 
     public void Dispose()

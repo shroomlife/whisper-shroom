@@ -190,6 +190,14 @@ public sealed partial class SettingsWindow : Window
         }
 
         Saved?.Invoke();
+
+        if (!ViewModel.HotkeyRegistered)
+        {
+            ErrorInfo.Message = $"Settings saved, but the hotkey {ViewModel.Hotkey.ToUpperInvariant()} is already used by another application. Choose a different combination.";
+            ErrorInfo.IsOpen = true;
+            return;
+        }
+
         this.Close();
     }
 

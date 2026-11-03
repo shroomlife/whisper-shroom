@@ -58,6 +58,8 @@ public partial class App : Application
     {
         ConfigService.Load();
         HistoryService.InitializeDatabase();
+        // Before any hotkey is registered, so no recording can be writing into the audio folder.
+        HistoryService.RecoverOrphanedRecordings();
         NotificationService.Register();
         MainViewModel = new MainViewModel();
 

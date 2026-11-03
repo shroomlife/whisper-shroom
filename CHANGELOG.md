@@ -2,6 +2,21 @@
 
 All notable changes to WhisperShroom will be documented in this file.
 
+## [1.11.0.0] - 2026-11-03
+
+### Fixed
+- **Last moment of a recording could be lost**: Stopping read the WAV out of memory right after asking NAudio to stop, while its capture thread could still be delivering the final buffer, and disposed the writer underneath it. `WasapiCapture.StopRecording()` only signals the capture thread; the recording is now finalized after NAudio raises `RecordingStopped`, so the final buffer is always included and no two threads touch the writer.
+- **Hotkey during transcription started a second recording**: The toggle only checked for the recording state, so pressing the hotkey while a transcription was running started a new recording, broke the UI state when the first one finished and could make Retry target the wrong entry. The toggle is now ignored while transcribing.
+- **Hotkey registration could silently fail**: The listener thread published its thread ID only after it had started, so a fast re-registration (opening and saving Settings) could miss it, leave the old thread holding the hotkey and make the new registration fail without notice. Registration now follows the documented `PostThreadMessage` pattern (message queue created via `PeekMessage`, readiness signalled before returning), and Settings report when another application already owns the chosen combination.
+- **Clipboard copy ignored Win32 failures**: `GlobalAlloc`, `GlobalLock` and `SetClipboardData` results are checked, and the memory is freed when ownership was not transferred to the system.
+
+### Changed
+- **Normal process priority**: The tray icon was created with H.NotifyIcon's default `enablesEfficiencyMode: true`, which put the whole app into `IDLE_PRIORITY_CLASS` plus EcoQoS for its entire lifetime, including recording and upload. Microsoft's guidance is that EcoQoS must not be used for foreground or performance-critical work. Windows now derives the quality of service from window visibility on its own.
+- **Recordings stream straight to disk**: Audio is written into `%APPDATA%\WhisperShroom\audio\` while recording instead of being buffered in memory and copied three times on stop. The WAV header is refreshed every two seconds, so a crash or forced exit leaves a valid file behind.
+- **Interrupted recordings are recovered**: On start, WAV files in the audio folder that no history entry references are repaired and listed in History as pending ("Recording was interrupted. Retry to transcribe."). Files without audio data are removed.
+- **Capture device unplugged mid-recording**: The error is reported instead of being swallowed, and the audio captured up to that point stays retryable.
+- **Symbol package in releases**: The MSIX tooling that ships with Windows App SDK 2.x writes the symbol package as `.appxsym` instead of `.msixsym`, so 1.10.0.0 was released without one. The release workflow accepts both.
+
 ## [1.10.0.0] - 2026-11-03
 
 ### Known issues

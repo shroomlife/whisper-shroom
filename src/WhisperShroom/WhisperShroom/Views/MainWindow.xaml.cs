@@ -104,7 +104,12 @@ public sealed partial class MainWindow : Window
         _trayIcon.MenuActivation = PopupActivationMode.None;
         _trayIcon.RightClickCommand = new RelayCommand(ShowNativeContextMenu);
 
-        _trayIcon.ForceCreate();
+        // ForceCreate() defaults to enablesEfficiencyMode: true, which puts the whole process
+        // into IDLE_PRIORITY_CLASS plus EcoQoS for its lifetime, including while recording and
+        // uploading. Microsoft's guidance is that EcoQoS must not be used for foreground or
+        // performance-critical work; without an explicit opt-in Windows derives the QoS from
+        // window visibility on its own, which already lowers it while the app sits in the tray.
+        _trayIcon.ForceCreate(enablesEfficiencyMode: false);
     }
 
     private void ShowNativeContextMenu()

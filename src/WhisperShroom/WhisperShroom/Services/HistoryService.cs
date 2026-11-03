@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using WhisperShroom.Helpers;
 using WhisperShroom.Models;
 
 namespace WhisperShroom.Services;
@@ -120,10 +121,19 @@ public sealed class HistoryService
 
     public string AddPendingEntry(string audioPath, string? model, string? language, string errorMessage)
     {
-        var id = Guid.NewGuid().ToString();
-
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
+
+        var id = InsertPendingEntry(connection, DateTimeOffset.Now, audioPath, model, language, errorMessage);
+        Changed?.Invoke();
+        return id;
+    }
+
+    private static string InsertPendingEntry(
+        SqliteConnection connection, DateTimeOffset timestamp, string audioPath,
+        string? model, string? language, string errorMessage)
+    {
+        var id = Guid.NewGuid().ToString();
 
         using var command = connection.CreateCommand();
         command.CommandText = """
@@ -132,16 +142,70 @@ public sealed class HistoryService
             """;
 
         command.Parameters.AddWithValue("@id", id);
-        command.Parameters.AddWithValue("@timestamp", DateTimeOffset.Now.ToString("o"));
+        command.Parameters.AddWithValue("@timestamp", timestamp.ToString("o"));
         command.Parameters.AddWithValue("@model", (object?)model ?? DBNull.Value);
         command.Parameters.AddWithValue("@language", (object?)language ?? DBNull.Value);
         command.Parameters.AddWithValue("@audioPath", audioPath);
         command.Parameters.AddWithValue("@errorMessage", errorMessage);
 
         command.ExecuteNonQuery();
-        Changed?.Invoke();
-
         return id;
+    }
+
+    public const string InterruptedRecordingMessage = "Recording was interrupted. Retry to transcribe.";
+
+    /// <summary>
+    /// Turns WAV files in the audio folder that no history entry references into pending
+    /// entries. Such files exist when the app ended while recording (crash, forced exit), since
+    /// the recording streams to disk and the entry is only written after the recording stops.
+    /// Files without any audio data are deleted. Must run before the first recording starts.
+    /// </summary>
+    public void RecoverOrphanedRecordings()
+    {
+        if (!Directory.Exists(_audioDir))
+            return;
+
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT audio_path FROM transcriptions WHERE audio_path IS NOT NULL";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                referenced.Add(Path.GetFullPath(reader.GetString(0)));
+        }
+
+        var recovered = 0;
+        foreach (var file in Directory.EnumerateFiles(_audioDir, "*.wav"))
+        {
+            if (referenced.Contains(Path.GetFullPath(file)))
+                continue;
+
+            long? dataBytes;
+            try
+            {
+                dataBytes = WavFileRepair.RepairHeader(file);
+            }
+            catch (IOException)
+            {
+                continue; // locked or unreadable; try again on the next start
+            }
+
+            if (dataBytes is null or 0)
+            {
+                TryDeleteFile(file);
+                continue;
+            }
+
+            InsertPendingEntry(connection, new DateTimeOffset(File.GetCreationTime(file)),
+                file, model: null, language: null, InterruptedRecordingMessage);
+            recovered++;
+        }
+
+        if (recovered > 0)
+            Changed?.Invoke();
     }
 
     public void CompletePendingEntry(string id, TranscriptionResult result)
